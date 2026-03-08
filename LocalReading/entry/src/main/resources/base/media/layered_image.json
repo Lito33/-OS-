@@ -1,0 +1,7 @@
+{
+  "layered-image":
+  {
+    "background" : "$media:appLogo",
+    "foreground" : "$media:appLogo"
+  }
+}
