@@ -7,6 +7,7 @@ const BOOKS_KEY = 'imported_books';
 interface StoredBookInfo {
   bookId: string;
   bookName: string;
+  bookAuthor: string;  // 作者
   filePath: string;
   coverPath: string;
   bookSourceType: number;
@@ -32,6 +33,7 @@ export class BookStorage {
       const storedBook: StoredBookInfo = {
         bookId: book.getBookId(),
         bookName: book.getBookName(),
+        bookAuthor: book.getBookAuthor() || '',
         filePath: book.getFilePath(),
         coverPath: book.getCoverPath() || '',
         bookSourceType: book.getBookSourceType(),
@@ -57,6 +59,7 @@ export class BookStorage {
         const book = new BookParserInfo();
         book.setBookId(item.bookId)
           .setBookName(item.bookName)
+          .setBookAuthor(item.bookAuthor || '')
           .setFilePath(item.filePath)
           .setCoverPath(item.coverPath || '')
           .setBookSourceType(item.bookSourceType ?? -1)
@@ -85,6 +88,7 @@ export class BookStorage {
           const storedBook: StoredBookInfo = {
             bookId: book.getBookId(),
             bookName: book.getBookName(),
+            bookAuthor: book.getBookAuthor() || '',
             filePath: book.getFilePath(),
             coverPath: book.getCoverPath() || '',
             bookSourceType: book.getBookSourceType(),

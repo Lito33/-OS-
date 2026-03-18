@@ -173,11 +173,15 @@ export class Index extends ViewPU {
         hilog.info(0x0000, TAG, 'Index page onPageShow: loading progresses');
         this.reloadData();
     }
-    //提取书籍封面
+    //提取书籍封面和作者信息
     private async extractCover(bookParserInfo: BookParserInfo, context: common.UIAbilityContext) {
         try {
             const handler: bookParser.BookParserHandler = await bookParser.getDefaultHandler(bookParserInfo.getFilePath());
             const bookInfo = handler.getBookInfo();
+            // 提取作者信息
+            if (bookInfo?.bookCreator) {
+                bookParserInfo.setBookAuthor(bookInfo.bookCreator);
+            }
             if (bookInfo?.bookCoverImage) {
                 const coverBuffer = handler.getResourceContent(-1, bookInfo.bookCoverImage);
                 if (coverBuffer && coverBuffer.byteLength > 0) {
@@ -658,16 +662,27 @@ export class Index extends ViewPU {
         RelativeContainer.pop();
     }
     //控制按钮是否继续阅读
+    // 根据书籍信息查找进度（优先使用 bookIdentity，其次使用 filePath）
+    private findProgress(book: BookParserInfo): BookProgress | undefined {
+        const bookIdentity = ProgressStorage.generateBookIdentity(book.getBookName(), book.getBookAuthor());
+        // 优先使用 bookIdentity 匹配
+        let progress = this.progresses.find(p => p.bookIdentity && p.bookIdentity === bookIdentity);
+        if (progress) {
+            return progress;
+        }
+        // 回退到 filePath 匹配
+        return this.progresses.find(p => p.filePath === book.getFilePath());
+    }
     private getButtonText(): ResourceStr {
         if (!this.selectedBook) {
             return { "id": 16777232, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" };
         }
-        const hasProgress = this.progresses.some(p => p.filePath === this.selectedBook!.getFilePath());
-        return hasProgress ? { "id": 16777227, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777232, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" };
+        const progress = this.findProgress(this.selectedBook);
+        return progress ? { "id": 16777227, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777232, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" };
     }
     //获取章节并展示
     private getChapterDisplay(book: BookParserInfo): string {
-        const progress = this.progresses.find(p => p.filePath === book.getFilePath());
+        const progress = this.findProgress(book);
         if (progress?.chapterName) {
             return `当前：${progress.chapterName}`;
         }
@@ -679,7 +694,7 @@ export class Index extends ViewPU {
             return;
         }
         const filePath = this.selectedBook!.getFilePath();
-        const progress = this.progresses.find(p => p.filePath === filePath);
+        const progress = this.findProgress(this.selectedBook!);
         const resourceIndex = progress?.resourceIndex ?? 0;
         const domPos = progress?.startDomPos ?? '';
         //将当前文件路径存入应用全局的键值存储中，这样其他组件或页面也能方便地获取该路径

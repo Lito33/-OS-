@@ -367,15 +367,19 @@ struct Reader {
     }
 
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const bookIdentity = ProgressStorage.generateBookIdentity(this.bookTitle, this.author);
     const progress: BookProgress = {
+      bookIdentity: bookIdentity,
       filePath: filePath,
+      bookName: this.bookTitle,
+      author: this.author,
       resourceIndex: data.resourceIndex,
       startDomPos: data.startDomPos || '',
       chapterName: chapterName,
       lastReadTime: Date.now()
     };
     
-    hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}`);
+    hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}, bookIdentity=${bookIdentity}`);
     await ProgressStorage.saveProgress(context, progress, currentUser);
     hilog.info(0x0000, TAG, 'saveCurrentProgress: progress saved successfully');
   }

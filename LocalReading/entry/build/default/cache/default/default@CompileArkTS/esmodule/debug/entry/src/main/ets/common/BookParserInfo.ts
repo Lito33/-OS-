@@ -22,6 +22,7 @@ export class BookParserInfo {
     private coverPath: string = '';
     private bookLanguage: string = '';
     private bookName: string = '';
+    private bookAuthor: string = ''; // 作者
     private bookId: string = '';
     private bookSourceType: number = -1;
     private localHash: string = '';
@@ -61,6 +62,13 @@ export class BookParserInfo {
     }
     public getBookName(): string {
         return this.bookName;
+    }
+    public setBookAuthor(value: string): BookParserInfo {
+        this.bookAuthor = value;
+        return this;
+    }
+    public getBookAuthor(): string {
+        return this.bookAuthor;
     }
     public setBookId(value: string): BookParserInfo {
         this.bookId = value;

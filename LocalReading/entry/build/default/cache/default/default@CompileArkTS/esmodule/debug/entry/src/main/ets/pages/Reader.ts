@@ -648,14 +648,18 @@ class Reader extends ViewPU {
             chapterName = '章节' + (data.resourceIndex + 1);
         }
         const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+        const bookIdentity = ProgressStorage.generateBookIdentity(this.bookTitle, this.author);
         const progress: BookProgress = {
+            bookIdentity: bookIdentity,
             filePath: filePath,
+            bookName: this.bookTitle,
+            author: this.author,
             resourceIndex: data.resourceIndex,
             startDomPos: data.startDomPos || '',
             chapterName: chapterName,
             lastReadTime: Date.now()
         };
-        hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}`);
+        hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}, bookIdentity=${bookIdentity}`);
         await ProgressStorage.saveProgress(context, progress, currentUser);
         hilog.info(0x0000, TAG, 'saveCurrentProgress: progress saved successfully');
     }
@@ -1673,7 +1677,7 @@ class Reader extends ViewPU {
                                 hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
                             }
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1194, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1198, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {

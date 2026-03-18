@@ -9,6 +9,8 @@ import buffer from "@ohos:buffer";
 import type { StoredUserCredential } from './PasswordUtil';
 import picker from "@ohos:file.picker";
 import { BookStorage } from "@bundle:com.example.readerkitdemo/entry/ets/common/BookStorage";
+import { ProgressStorage } from "@bundle:com.example.readerkitdemo/entry/ets/common/ProgressStorage";
+import type { BookProgress } from "@bundle:com.example.readerkitdemo/entry/ets/common/ProgressStorage";
 const TAG = 'SyncManager';
 // 简化的同步数据结构
 export interface SyncData {
@@ -18,6 +20,7 @@ export interface SyncData {
     currentUser: string;
     settings: PersistedReaderSettings | null;
     bookNames: string[]; // 仅保存书名列表，用于提示用户
+    progresses: BookProgress[]; // 阅读进度数据
 }
 export interface ImportResult {
     success: boolean;
@@ -27,7 +30,7 @@ export interface ImportResult {
 export class SyncManager {
     /**
      * 导出数据到文件（用于手动同步）
-     * 仅导出用户账号、阅读设置和书名列表（用于提示）
+     * 导出用户账号、阅读设置、书名列表和阅读进度
      */
     static async exportData(): Promise<string> {
         try {
@@ -58,18 +61,34 @@ export class SyncManager {
                 }
             }
             hilog.info(0x0000, TAG, `导出书名列表: ${bookNames.length} 本`);
-            // 4. 构建同步数据
+            // 4. 获取所有用户的阅读进度
+            const allProgresses: BookProgress[] = [];
+            for (const account of userAccounts) {
+                const userProgresses = await ProgressStorage.loadAllProgresses(context, account);
+                // 为每个进度添加用户标识，便于导入时区分
+                for (const progress of userProgresses) {
+                    allProgresses.push(progress);
+                }
+            }
+            // 同时获取当前用户的进度（如果用户列表为空但有当前用户）
+            if (currentUser && !userAccounts.includes(currentUser)) {
+                const currentUserProgresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+                allProgresses.push(...currentUserProgresses);
+            }
+            hilog.info(0x0000, TAG, `导出阅读进度: ${allProgresses.length} 条`);
+            // 5. 构建同步数据
             const syncData: SyncData = {
-                version: '2.0',
+                version: '3.0',
                 timestamp: Date.now(),
                 users: users,
                 currentUser: currentUser,
                 settings: settings,
-                bookNames: bookNames
+                bookNames: bookNames,
+                progresses: allProgresses
             };
             const jsonData = JSON.stringify(syncData, null, 2);
             hilog.info(0x0000, TAG, `准备写入数据，大小: ${jsonData.length} 字节`);
-            // 5. 写入文件
+            // 6. 写入文件
             const file = fileIo.openSync(userSaveUri, fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.CREATE);
             const buf = buffer.from(jsonData, 'utf-8');
             fileIo.writeSync(file.fd, buf.buffer);
@@ -84,7 +103,7 @@ export class SyncManager {
     }
     /**
      * 从文件导入数据（用于手动同步）
-     * 仅导入用户账号和阅读设置，返回书名列表用于提示
+     * 导入用户账号、阅读设置和阅读进度，返回书名列表用于提示
      * @param fileUri 文件URI（从文件选择器获取）
      */
     static async importData(fileUri: string): Promise<ImportResult> {
@@ -113,6 +132,14 @@ export class SyncManager {
             if (syncData.currentUser) {
                 await StorageUtil.setLoggedIn(syncData.currentUser);
             }
+            // 恢复阅读进度（版本3.0及以上支持）
+            if (syncData.version >= '3.0' && syncData.progresses && syncData.progresses.length > 0) {
+                await SyncManager.importProgresses(context, syncData.progresses, syncData.currentUser);
+                hilog.info(0x0000, TAG, `导入阅读进度: ${syncData.progresses.length} 条`);
+            }
+            else {
+                hilog.info(0x0000, TAG, '导入数据不包含阅读进度或版本过低');
+            }
             hilog.info(0x0000, TAG, 'Import success');
             return {
                 success: true,
@@ -123,6 +150,65 @@ export class SyncManager {
         catch (error) {
             hilog.error(0x0000, TAG, `Import failed: ${error.message}`);
             return { success: false, message: `导入失败: ${error.message}` };
+        }
+    }
+    /**
+     * 导入阅读进度数据
+     * 合并策略：对于相同书籍，取较新的进度
+     */
+    private static async importProgresses(context: common.UIAbilityContext, importedProgresses: BookProgress[], currentUser?: string): Promise<void> {
+        try {
+            // 如果没有当前用户，跳过导入
+            if (!currentUser) {
+                hilog.warn(0x0000, TAG, 'No current user, skip progress import');
+                return;
+            }
+            // 获取当前用户的本地进度
+            const localProgresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+            const localMap = new Map<string, BookProgress>();
+            for (const progress of localProgresses) {
+                if (progress.bookIdentity) {
+                    localMap.set(progress.bookIdentity, progress);
+                }
+            }
+            // 合并导入的进度
+            let addedCount = 0;
+            let updatedCount = 0;
+            for (const importedProgress of importedProgresses) {
+                if (!importedProgress.bookIdentity)
+                    continue;
+                const localProgress = localMap.get(importedProgress.bookIdentity);
+                if (!localProgress) {
+                    // 本地没有此书籍进度，直接添加
+                    localMap.set(importedProgress.bookIdentity, importedProgress);
+                    addedCount++;
+                }
+                else {
+                    // 本地有此书籍，比较时间戳，取较新的
+                    if (importedProgress.lastReadTime > localProgress.lastReadTime) {
+                        // 导入的更新，合并（保留本地 filePath）
+                        const merged: BookProgress = {
+                            bookIdentity: importedProgress.bookIdentity,
+                            filePath: localProgress.filePath || importedProgress.filePath,
+                            bookName: importedProgress.bookName,
+                            author: importedProgress.author,
+                            resourceIndex: importedProgress.resourceIndex,
+                            startDomPos: importedProgress.startDomPos,
+                            chapterName: importedProgress.chapterName,
+                            lastReadTime: importedProgress.lastReadTime
+                        };
+                        localMap.set(importedProgress.bookIdentity, merged);
+                        updatedCount++;
+                    }
+                }
+            }
+            // 保存合并后的进度
+            const mergedProgresses = Array.from(localMap.values());
+            await ProgressStorage.saveAllProgresses(context, mergedProgresses, currentUser);
+            hilog.info(0x0000, TAG, `阅读进度合并完成: 新增 ${addedCount} 条, 更新 ${updatedCount} 条`);
+        }
+        catch (error) {
+            hilog.error(0x0000, TAG, `Import progresses failed: ${error.message}`);
         }
     }
     /**

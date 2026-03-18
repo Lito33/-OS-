@@ -7,6 +7,8 @@ import { SettingStorage } from "@bundle:com.example.readerkitdemo/entry/ets/comm
 import type { PersistedReaderSettings } from "@bundle:com.example.readerkitdemo/entry/ets/common/SettingStorage";
 import { GlobalContext } from "@bundle:com.example.readerkitdemo/entry/ets/common/GlobalContext";
 import type { StoredUserCredential } from './PasswordUtil';
+import { ProgressStorage } from "@bundle:com.example.readerkitdemo/entry/ets/common/ProgressStorage";
+import type { BookProgress } from "@bundle:com.example.readerkitdemo/entry/ets/common/ProgressStorage";
 const TAG = 'DistributedSyncManager';
 const SESSION_ID = 'local_reading_sync_v2'; // 固定sessionId，同账号设备自动同步
 // 同步数据结构
@@ -16,6 +18,7 @@ class SyncDataObject {
     usersJson: string = '{}'; // Record<string, StoredUserCredential> 的 JSON
     currentUser: string = '';
     settingsJson: string = ''; // PersistedReaderSettings 的 JSON
+    progressesJson: string = '[]'; // BookProgress[] 的 JSON（阅读进度）
 }
 // 同步状态
 export interface SyncStatus {
@@ -111,6 +114,12 @@ export class DistributedSyncManager {
                 const settings: PersistedReaderSettings = JSON.parse(remoteSettingsJson);
                 await SettingStorage.saveSettings(context, settings);
             }
+            // 恢复阅读进度
+            const remoteProgressesJson = this.dataObject['progressesJson'] as string;
+            if (remoteProgressesJson) {
+                const remoteProgresses: BookProgress[] = JSON.parse(remoteProgressesJson);
+                await this.mergeReadingProgresses(context, remoteProgresses);
+            }
             // 设置当前用户
             const remoteCurrentUser = this.dataObject['currentUser'] as string;
             if (remoteCurrentUser) {
@@ -130,6 +139,63 @@ export class DistributedSyncManager {
         }
     }
     /**
+     * 合并远程阅读进度到本地
+     * 策略：对于相同书籍，取较新的阅读进度
+     */
+    private async mergeReadingProgresses(context: common.UIAbilityContext, remoteProgresses: BookProgress[]): Promise<void> {
+        try {
+            const currentUser = await StorageUtil.getCurrentUser();
+            const localProgresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+            // 创建本地进度映射（按 bookIdentity 索引）
+            const localMap = new Map<string, BookProgress>();
+            for (const progress of localProgresses) {
+                if (progress.bookIdentity) {
+                    localMap.set(progress.bookIdentity, progress);
+                }
+            }
+            // 合并远程进度
+            for (const remoteProgress of remoteProgresses) {
+                if (!remoteProgress.bookIdentity)
+                    continue;
+                const localProgress = localMap.get(remoteProgress.bookIdentity);
+                if (!localProgress) {
+                    // 本地没有此书籍进度，直接添加（保留本地 filePath 为空，后续用户打开书籍时会更新）
+                    localMap.set(remoteProgress.bookIdentity, remoteProgress);
+                    hilog.info(0x0000, TAG, `Added new progress: ${remoteProgress.bookName}`);
+                }
+                else {
+                    // 本地有此书籍，比较时间戳，取较新的
+                    if (remoteProgress.lastReadTime > localProgress.lastReadTime) {
+                        // 远程更新，合并（保留本地 filePath）
+                        const merged: BookProgress = {
+                            bookIdentity: remoteProgress.bookIdentity,
+                            filePath: localProgress.filePath || remoteProgress.filePath,
+                            bookName: remoteProgress.bookName,
+                            author: remoteProgress.author,
+                            resourceIndex: remoteProgress.resourceIndex,
+                            startDomPos: remoteProgress.startDomPos,
+                            chapterName: remoteProgress.chapterName,
+                            lastReadTime: remoteProgress.lastReadTime
+                        };
+                        localMap.set(remoteProgress.bookIdentity, merged);
+                        hilog.info(0x0000, TAG, `Updated progress: ${remoteProgress.bookName}`);
+                    }
+                    else {
+                        hilog.info(0x0000, TAG, `Kept local progress: ${localProgress.bookName}`);
+                    }
+                }
+            }
+            // 保存合并后的进度
+            const mergedProgresses = Array.from(localMap.values());
+            await ProgressStorage.saveAllProgresses(context, mergedProgresses, currentUser);
+            hilog.info(0x0000, TAG, `Merged ${mergedProgresses.length} reading progresses`);
+        }
+        catch (error) {
+            const err = error as BusinessError;
+            hilog.error(0x0000, TAG, `Merge reading progresses failed: ${err.message}`);
+        }
+    }
+    /**
      * 同步本地数据到分布式对象
      */
     async syncData(): Promise<boolean> {
@@ -144,6 +210,7 @@ export class DistributedSyncManager {
             const users = await StorageUtil.getAllUsers();
             const currentUser = await StorageUtil.getCurrentUser();
             const settings = await SettingStorage.loadSettings(context);
+            const progresses = await ProgressStorage.loadAllProgresses(context, currentUser);
             const now = Date.now();
             // 更新分布式对象属性
             this.dataObject['version'] = '1.0';
@@ -151,12 +218,13 @@ export class DistributedSyncManager {
             this.dataObject['usersJson'] = JSON.stringify(users);
             this.dataObject['currentUser'] = currentUser;
             this.dataObject['settingsJson'] = settings ? JSON.stringify(settings) : '';
+            this.dataObject['progressesJson'] = JSON.stringify(progresses);
             // 保存到本地持久化（"local" 表示本地设备）
             await this.dataObject.save('local');
             this.syncStatus.lastSyncTime = now;
             this.syncStatus.isSyncing = false;
             this.syncStatus.syncError = undefined;
-            hilog.info(0x0000, TAG, 'Data synced successfully');
+            hilog.info(0x0000, TAG, `Data synced successfully, including ${progresses.length} reading progresses`);
             return true;
         }
         catch (error) {
@@ -164,6 +232,33 @@ export class DistributedSyncManager {
             this.syncStatus.isSyncing = false;
             this.syncStatus.syncError = err.message;
             hilog.error(0x0000, TAG, `Sync failed: ${err.message}`);
+            return false;
+        }
+    }
+    /**
+     * 仅同步阅读进度（轻量级同步，用于阅读过程中实时同步）
+     */
+    async syncProgressOnly(): Promise<boolean> {
+        if (!this.dataObject) {
+            hilog.warn(0x0000, TAG, 'Data object not initialized');
+            return false;
+        }
+        try {
+            const context = GlobalContext.getInstance().getContext() as common.UIAbilityContext;
+            const currentUser = await StorageUtil.getCurrentUser();
+            const progresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+            const now = Date.now();
+            // 仅更新进度相关属性
+            this.dataObject['timestamp'] = now;
+            this.dataObject['progressesJson'] = JSON.stringify(progresses);
+            await this.dataObject.save('local');
+            this.syncStatus.lastSyncTime = now;
+            hilog.info(0x0000, TAG, `Progress synced: ${progresses.length} records`);
+            return true;
+        }
+        catch (error) {
+            const err = error as BusinessError;
+            hilog.error(0x0000, TAG, `Progress sync failed: ${err.message}`);
             return false;
         }
     }

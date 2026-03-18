@@ -71,11 +71,16 @@ export struct Index {
     this.reloadData();
   }
 
-  //提取书籍封面
+  //提取书籍封面和作者信息
   private async extractCover(bookParserInfo: BookParserInfo, context: common.UIAbilityContext) {
     try {
       const handler: bookParser.BookParserHandler = await bookParser.getDefaultHandler(bookParserInfo.getFilePath());
       const bookInfo = handler.getBookInfo();
+
+      // 提取作者信息
+      if (bookInfo?.bookCreator) {
+        bookParserInfo.setBookAuthor(bookInfo.bookCreator);
+      }
 
       if (bookInfo?.bookCoverImage) {
         const coverBuffer = handler.getResourceContent(-1, bookInfo.bookCoverImage);
@@ -438,17 +443,29 @@ export struct Index {
     .padding({ left: 16, right: 16 })
   }
   //控制按钮是否继续阅读
+  // 根据书籍信息查找进度（优先使用 bookIdentity，其次使用 filePath）
+  private findProgress(book: BookParserInfo): BookProgress | undefined {
+    const bookIdentity = ProgressStorage.generateBookIdentity(book.getBookName(), book.getBookAuthor());
+    // 优先使用 bookIdentity 匹配
+    let progress = this.progresses.find(p => p.bookIdentity && p.bookIdentity === bookIdentity);
+    if (progress) {
+      return progress;
+    }
+    // 回退到 filePath 匹配
+    return this.progresses.find(p => p.filePath === book.getFilePath());
+  }
+
   private getButtonText(): ResourceStr {
     if (!this.selectedBook) {
       return $r('app.string.go_to_reader');
     }
-    const hasProgress = this.progresses.some(p => p.filePath === this.selectedBook!.getFilePath());
-    return hasProgress ? $r('app.string.continue_reading') : $r('app.string.go_to_reader');
+    const progress = this.findProgress(this.selectedBook);
+    return progress ? $r('app.string.continue_reading') : $r('app.string.go_to_reader');
   }
 
   //获取章节并展示
   private getChapterDisplay(book: BookParserInfo): string {
-    const progress = this.progresses.find(p => p.filePath === book.getFilePath());
+    const progress = this.findProgress(book);
     if (progress?.chapterName) {
       return `当前：${progress.chapterName}`;
     }
@@ -461,7 +478,7 @@ export struct Index {
       return;
     }
     const filePath = this.selectedBook!.getFilePath();
-    const progress = this.progresses.find(p => p.filePath === filePath);
+    const progress = this.findProgress(this.selectedBook!);
     const resourceIndex = progress?.resourceIndex ?? 0;
     const domPos = progress?.startDomPos ?? '';
 

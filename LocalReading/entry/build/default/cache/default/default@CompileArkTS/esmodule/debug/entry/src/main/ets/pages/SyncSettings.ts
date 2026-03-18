@@ -13,6 +13,8 @@ interface SyncSettings_Params {
     context?: common.UIAbilityContext;
     syncManager?: DistributedSyncManager;
     statusMonitorTimer?: number;
+    autoSyncTimer?: number;
+    AUTO_SYNC_INTERVAL?: number;
 }
 import { DistributedSyncManager } from "@bundle:com.example.readerkitdemo/entry/ets/utils/DistributedSyncManager";
 import type { SyncStatus } from "@bundle:com.example.readerkitdemo/entry/ets/utils/DistributedSyncManager";
@@ -47,6 +49,10 @@ class SyncSettings extends ViewPU {
         this.syncManager = DistributedSyncManager.getInstance();
         this.statusMonitorTimer = -1 // 状态监控定时器ID
         ;
+        this.autoSyncTimer = -1 // 自动同步定时器ID
+        ;
+        this.AUTO_SYNC_INTERVAL = 5 * 60 * 1000 // 自动同步间隔：5分钟
+        ;
         this.setInitiallyProvidedValue(params);
         this.finalizeConstruction();
     }
@@ -80,6 +86,12 @@ class SyncSettings extends ViewPU {
         }
         if (params.statusMonitorTimer !== undefined) {
             this.statusMonitorTimer = params.statusMonitorTimer;
+        }
+        if (params.autoSyncTimer !== undefined) {
+            this.autoSyncTimer = params.autoSyncTimer;
+        }
+        if (params.AUTO_SYNC_INTERVAL !== undefined) {
+            this.AUTO_SYNC_INTERVAL = params.AUTO_SYNC_INTERVAL;
         }
     }
     updateStateVars(params: SyncSettings_Params) {
@@ -165,12 +177,15 @@ class SyncSettings extends ViewPU {
     private context: common.UIAbilityContext;
     private syncManager: DistributedSyncManager;
     private statusMonitorTimer: number; // 状态监控定时器ID
+    private autoSyncTimer: number; // 自动同步定时器ID
+    private readonly AUTO_SYNC_INTERVAL: number; // 自动同步间隔：5分钟
     aboutToAppear() {
         this.loadSyncStatus();
         this.startSyncStatusMonitoring();
     }
     aboutToDisappear() {
         this.stopSyncStatusMonitoring();
+        this.stopAutoSync();
     }
     initialRender() {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -436,6 +451,13 @@ class SyncSettings extends ViewPU {
             Toggle.onChange((value: boolean) => {
                 this.autoSyncEnabled = value;
                 this.saveSyncSettings();
+                // 立即启动或停止自动同步
+                if (value) {
+                    this.startAutoSync();
+                }
+                else {
+                    this.stopAutoSync();
+                }
             });
         }, Toggle);
         Toggle.pop();
@@ -622,6 +644,61 @@ class SyncSettings extends ViewPU {
             clearInterval(this.statusMonitorTimer);
             hilog.info(0x0000, TAG, `状态监控已停止，清理定时器ID: ${this.statusMonitorTimer}`);
             this.statusMonitorTimer = -1;
+        }
+    }
+    // 启动自动同步
+    private startAutoSync() {
+        // 先停止之前的定时器
+        this.stopAutoSync();
+        // 检查权限
+        this.checkAndRequestPermission().then((hasPermission) => {
+            if (!hasPermission) {
+                hilog.warn(0x0000, TAG, '没有分布式同步权限，无法启动自动同步');
+                this.autoSyncEnabled = false;
+                this.saveSyncSettings();
+                return;
+            }
+            // 立即执行一次同步
+            this.performAutoSync();
+            // 启动定时同步
+            this.autoSyncTimer = setInterval(() => {
+                this.performAutoSync();
+            }, this.AUTO_SYNC_INTERVAL);
+            hilog.info(0x0000, TAG, `自动同步已启动，间隔: ${this.AUTO_SYNC_INTERVAL / 1000} 秒`);
+            promptAction.showToast({
+                message: '自动同步已开启',
+                duration: 1500
+            });
+        });
+    }
+    // 停止自动同步
+    private stopAutoSync() {
+        if (this.autoSyncTimer !== -1) {
+            clearInterval(this.autoSyncTimer);
+            hilog.info(0x0000, TAG, `自动同步已停止，清理定时器ID: ${this.autoSyncTimer}`);
+            this.autoSyncTimer = -1;
+        }
+    }
+    // 执行自动同步
+    private async performAutoSync() {
+        // 如果正在同步，跳过
+        if (this.syncStatus.isSyncing) {
+            hilog.info(0x0000, TAG, '正在同步中，跳过本次自动同步');
+            return;
+        }
+        hilog.info(0x0000, TAG, '开始执行自动同步...');
+        try {
+            const success = await this.syncManager.syncData();
+            if (success) {
+                hilog.info(0x0000, TAG, '自动同步成功');
+                this.updateSyncStatus();
+            }
+            else {
+                hilog.warn(0x0000, TAG, '自动同步失败');
+            }
+        }
+        catch (error) {
+            hilog.error(0x0000, TAG, `自动同步出错: ${error.message}`);
         }
     }
     // 更新同步状态
@@ -835,7 +912,11 @@ class SyncSettings extends ViewPU {
             const prefs = await preferences.getPreferences(context, 'sync_preferences');
             this.autoSyncEnabled = await prefs.get('auto_sync_enabled', false) as boolean;
             this.wifiOnlySync = await prefs.get('wifi_only_sync', true) as boolean;
-            hilog.info(0x0000, TAG, '同步设置加载成功');
+            hilog.info(0x0000, TAG, `同步设置加载成功，自动同步: ${this.autoSyncEnabled}`);
+            // 如果自动同步已开启，启动定时同步
+            if (this.autoSyncEnabled) {
+                this.startAutoSync();
+            }
         }
         catch (error) {
             hilog.error(0x0000, TAG, `加载同步设置失败: ${error.message}`);

@@ -5,11 +5,14 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const TAG = "ProgressStorage"
 
 export interface BookProgress {
-  filePath: string;
-  resourceIndex: number;
-  startDomPos: string;
-  chapterName: string;
-  lastReadTime: number;
+  bookIdentity: string;      // 书籍唯一标识（书名_作者），用于跨设备匹配
+  filePath: string;          // 本地文件路径（之前用本地存储使用来定位文件ToT）
+  bookName: string;          // 书名
+  author: string;            // 作者
+  resourceIndex: number;     // 章节索引
+  startDomPos: string;       // 文档位置
+  chapterName: string;       // 章节名
+  lastReadTime: number;      // 最后阅读时间
 }
 
 export class ProgressStorage {
@@ -53,11 +56,17 @@ export class ProgressStorage {
     account?: string
   ): Promise<void> {
     const progresses = await ProgressStorage.loadAllProgresses(context, account);
-    const index = progresses.findIndex(p => p.filePath === progress.filePath);
+    // 优先使用 bookIdentity 匹配，其次使用 filePath
+    const index = progresses.findIndex(p => 
+      (p.bookIdentity && progress.bookIdentity && p.bookIdentity === progress.bookIdentity) ||
+      p.filePath === progress.filePath
+    );
     
-    //手动合并对象属性，避免使用扩展运算符
     const newProgress: BookProgress = {
+      bookIdentity: progress.bookIdentity || ProgressStorage.generateBookIdentity(progress.bookName, progress.author),
       filePath: progress.filePath,
+      bookName: progress.bookName,
+      author: progress.author,
       resourceIndex: progress.resourceIndex,
       startDomPos: progress.startDomPos,
       chapterName: progress.chapterName,
@@ -85,7 +94,10 @@ export class ProgressStorage {
     } else {
       // 返回默认的进度对象
       const defaultProgress: BookProgress = {
+        bookIdentity: '',
         filePath: filePath,
+        bookName: '',
+        author: '',
         resourceIndex: 0,
         startDomPos: '',
         chapterName: '',
@@ -93,5 +105,65 @@ export class ProgressStorage {
       };
       return defaultProgress;
     }
+  }
+
+  /**
+   * 根据书籍标识获取进度（用于跨设备同步匹配）
+   */
+  static async getProgressByIdentity(
+    context: common.UIAbilityContext,
+    bookIdentity: string,
+    account?: string
+  ): Promise<BookProgress | null> {
+    const progresses = await ProgressStorage.loadAllProgresses(context, account);
+    return progresses.find(p => p.bookIdentity === bookIdentity) || null;
+  }
+
+  /**
+   * 生成书籍唯一标识
+   */
+  static generateBookIdentity(bookName: string, author: string): string {
+    const name = (bookName || '').trim().toLowerCase();
+    const auth = (author || '').trim().toLowerCase();
+    return `${name}_${auth}`;
+  }
+
+  /**
+   * 合并远程进度到本地（用于同步）
+   * 如果本地有相同书籍，更新进度；否则添加新进度
+   */
+  static async mergeProgress(
+    context: common.UIAbilityContext,
+    remoteProgress: BookProgress,
+    localFilePath: string,
+    account?: string
+  ): Promise<void> {
+    const progresses = await ProgressStorage.loadAllProgresses(context, account);
+    
+    // 查找本地是否有相同书籍（通过 bookIdentity 匹配）
+    const index = progresses.findIndex(p => 
+      p.bookIdentity && remoteProgress.bookIdentity && p.bookIdentity === remoteProgress.bookIdentity
+    );
+    
+    const mergedProgress: BookProgress = {
+      bookIdentity: remoteProgress.bookIdentity,
+      filePath: localFilePath,
+      bookName: remoteProgress.bookName,
+      author: remoteProgress.author,
+      resourceIndex: remoteProgress.resourceIndex,
+      startDomPos: remoteProgress.startDomPos,
+      chapterName: remoteProgress.chapterName,
+      lastReadTime: remoteProgress.lastReadTime
+    };
+    
+    if (index >= 0) {
+      // 本地有记录，更新进度（保留本地 filePath）
+      progresses[index] = mergedProgress;
+    } else {
+      // 本地无记录，添加新进度
+      progresses.push(mergedProgress);
+    }
+    
+    await ProgressStorage.saveAllProgresses(context, progresses, account);
   }
 }

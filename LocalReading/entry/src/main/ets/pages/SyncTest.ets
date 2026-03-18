@@ -3,6 +3,7 @@ import { StorageUtil } from '../utils/StorageUtil';
 import { SettingStorage } from '../common/SettingStorage';
 import { GlobalContext } from '../common/GlobalContext';
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
+import { ProgressStorage, BookProgress } from '../common/ProgressStorage';
 
 @Entry
 @Component
@@ -10,6 +11,7 @@ struct SyncTest {
   @State testLog: string = '等待测试...';
   @State syncStatus: SyncStatus | null = null;
   @State isInitialized: boolean = false;
+  @State progressCount: number = 0;  // 阅读进度数量
 
   aboutToAppear(): void {
     this.checkStatus();
@@ -82,8 +84,15 @@ struct SyncTest {
     
     try {
       const success = await DistributedSyncManager.getInstance().syncData();
+      
+      // 获取阅读进度数量
+      const context = GlobalContext.getInstance().getContext() as common.UIAbilityContext;
+      const currentUser = await StorageUtil.getCurrentUser();
+      const progresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+      this.progressCount = progresses.length;
+      
       this.testLog = success 
-        ? '✅ 数据同步成功！\n- 用户数据已序列化\n- 设置已序列化\n- 已写入分布式对象'
+        ? `✅ 数据同步成功！\n- 用户数据已序列化\n- 设置已序列化\n- 阅读进度已序列化 (${progresses.length} 条)\n- 已写入分布式对象`
         : '❌ 同步失败';
       this.checkStatus();
     } catch (error) {
@@ -96,8 +105,15 @@ struct SyncTest {
     
     try {
       const success = await DistributedSyncManager.getInstance().restoreData();
+      
+      // 获取恢复后的阅读进度
+      const context = GlobalContext.getInstance().getContext() as common.UIAbilityContext;
+      const currentUser = await StorageUtil.getCurrentUser();
+      const progresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+      this.progressCount = progresses.length;
+      
       this.testLog = success 
-        ? '✅ 数据恢复成功！\n- 已从分布式对象读取数据\n- 已写入本地存储'
+        ? `✅ 数据恢复成功！\n- 已从分布式对象读取数据\n- 已写入本地存储\n- 阅读进度: ${progresses.length} 条`
         : '❌ 恢复失败（可能没有远程数据）';
       this.checkStatus();
     } catch (error) {
@@ -114,6 +130,18 @@ struct SyncTest {
       const currentUser = await StorageUtil.getCurrentUser();
       const settings = await SettingStorage.loadSettings(context);
       
+      // 获取阅读进度
+      const progresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+      this.progressCount = progresses.length;
+      
+      // 格式化阅读进度信息
+      let progressInfo = '无阅读进度';
+      if (progresses.length > 0) {
+        progressInfo = progresses.map((p: BookProgress, index: number) => 
+          `  ${index + 1}. ${p.bookName || '未知书籍'}\n     章节: ${p.chapterName || '未知'} (索引: ${p.resourceIndex})\n     最后阅读: ${p.lastReadTime > 0 ? new Date(p.lastReadTime).toLocaleString() : '未知'}`
+        ).join('\n');
+      }
+      
       this.testLog = `✅ 本地数据读取成功！
       
 用户列表: ${Object.keys(users).length} 个用户
@@ -124,7 +152,10 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
 设置信息:
   - 字体大小: ${settings?.fontSize ?? '默认'}
   - 夜间模式: ${settings?.nightMode ? '开启' : '关闭'}
-  - 主题颜色: ${settings?.themeColor ?? '默认'}`;
+  - 主题颜色: ${settings?.themeColor ?? '默认'}
+
+阅读进度: ${progresses.length} 条记录
+${progressInfo}`;
     } catch (error) {
       this.testLog = `❌ 读取异常: ${JSON.stringify(error)}`;
     }
@@ -134,7 +165,7 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
     this.testLog = '开始完整流程测试...\n';
     
     // 0. 请求权限
-    this.testLog += '\n[0/4] 请求分布式数据同步权限...';
+    this.testLog += '\n[0/5] 请求分布式数据同步权限...';
     const hasPermission = await this.requestPermission();
     this.testLog += hasPermission ? ' ✅' : ' ❌';
     
@@ -143,7 +174,7 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
     }
     
     // 1. 初始化
-    this.testLog += '\n[1/4] 初始化分布式管理器...';
+    this.testLog += '\n[1/5] 初始化分布式管理器...';
     const initSuccess = await DistributedSyncManager.getInstance().initialize();
     this.testLog += initSuccess ? ' ✅' : ' ❌';
     
@@ -152,22 +183,77 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
     }
     
     // 2. 同步数据
-    this.testLog += '\n[2/4] 同步本地数据到分布式对象...';
+    this.testLog += '\n[2/5] 同步本地数据到分布式对象...';
     const syncSuccess = await DistributedSyncManager.getInstance().syncData();
     this.testLog += syncSuccess ? ' ✅' : ' ❌';
     
     // 3. 模拟远程数据变化（单设备测试）
-    this.testLog += '\n[3/4] 验证数据持久化...';
+    this.testLog += '\n[3/5] 验证数据持久化...';
     await new Promise<void>((resolve: Function) => { setTimeout(resolve, 500); });
     this.testLog += ' ✅';
     
     // 4. 恢复数据
-    this.testLog += '\n[4/4] 从分布式对象恢复数据...';
+    this.testLog += '\n[4/5] 从分布式对象恢复数据...';
     const restoreSuccess = await DistributedSyncManager.getInstance().restoreData();
     this.testLog += restoreSuccess ? ' ✅' : ' ⚠️ (无远程数据是正常的)';
     
+    // 5. 验证阅读进度
+    this.testLog += '\n[5/5] 验证阅读进度同步...';
+    const context = GlobalContext.getInstance().getContext() as common.UIAbilityContext;
+    const currentUser = await StorageUtil.getCurrentUser();
+    const progresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+    this.progressCount = progresses.length;
+    this.testLog += ` ✅ (${progresses.length} 条进度)`;
+    
     this.testLog += '\n\n✅ 完整流程测试完成！';
     this.checkStatus();
+  }
+  
+  // 测试阅读进度同步
+  async testProgressSync(): Promise<void> {
+    this.testLog = '正在测试阅读进度同步...\n';
+    
+    try {
+      const context = GlobalContext.getInstance().getContext() as common.UIAbilityContext;
+      const currentUser = await StorageUtil.getCurrentUser();
+      
+      if (!currentUser) {
+        this.testLog += '\n❌ 请先登录用户';
+        return;
+      }
+      
+      // 1. 读取本地阅读进度
+      this.testLog += '\n[1/3] 读取本地阅读进度...';
+      const localProgresses = await ProgressStorage.loadAllProgresses(context, currentUser);
+      this.testLog += ` ✅ (${localProgresses.length} 条)`;
+      
+      // 2. 同步到分布式对象
+      this.testLog += '\n[2/3] 同步阅读进度到分布式对象...';
+      const syncSuccess = await DistributedSyncManager.getInstance().syncProgressOnly();
+      this.testLog += syncSuccess ? ' ✅' : ' ❌';
+      
+      // 3. 验证同步结果
+      this.testLog += '\n[3/3] 验证同步结果...';
+      this.progressCount = localProgresses.length;
+      
+      // 显示进度详情
+      if (localProgresses.length > 0) {
+        this.testLog += ' ✅\n\n已同步的阅读进度:';
+        for (let i = 0; i < Math.min(localProgresses.length, 5); i++) {
+          const p = localProgresses[i];
+          this.testLog += `\n  ${i + 1}. ${p.bookName} - ${p.chapterName}`;
+        }
+        if (localProgresses.length > 5) {
+          this.testLog += `\n  ... 还有 ${localProgresses.length - 5} 条`;
+        }
+      } else {
+        this.testLog += ' ⚠️ 暂无阅读进度数据';
+      }
+      
+      this.testLog += '\n\n✅ 阅读进度同步测试完成！';
+    } catch (error) {
+      this.testLog = `❌ 测试异常: ${JSON.stringify(error)}`;
+    }
   }
 
   build() {
@@ -177,6 +263,7 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .margin({ top: 20 })
+        .fontColor('#666')
       
       // 状态显示
       if (this.syncStatus) {
@@ -193,6 +280,23 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
         .width('90%')
         .padding(10)
         .backgroundColor('#F5F5F5')
+        .borderRadius(8)
+      }
+      
+      // 阅读进度数量显示
+      if (this.progressCount > 0) {
+        Row({ space: 8 }) {
+          Text('📚 阅读进度:')
+            .fontSize(14)
+            .fontColor('#666')
+          Text(`${this.progressCount} 条`)
+            .fontSize(14)
+            .fontColor('#4CAF50')
+            .fontWeight(FontWeight.Medium)
+        }
+        .width('90%')
+        .padding(10)
+        .backgroundColor('#E8F5E9')
         .borderRadius(8)
       }
       
@@ -218,6 +322,11 @@ ${Object.keys(users).map(u => `  - ${u}`).join('\n')}
           .width('90%')
           .backgroundColor('#9C27B0')
           .onClick(() => this.testLocalData())
+        
+        Button('5. 测试阅读进度同步')
+          .width('90%')
+          .backgroundColor('#FF9800')
+          .onClick(() => this.testProgressSync())
         
         Button('🚀 完整流程测试')
           .width('90%')
