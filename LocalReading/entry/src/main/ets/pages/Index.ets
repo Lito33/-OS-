@@ -209,10 +209,23 @@ export struct Index {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     hilog.info(0x0000,TAG,`Index reloadData: currentUser = ${this.currentUser}`);
     // 根据当前用户加载数据（如果 currentUser 为空，则加载空数据，是的没登陆也能用）
-    this.importedBooks = await BookStorage.loadBooks(context, this.currentUser);
-    hilog.info(0x0000,TAG,`Index reloadData: loaded ${this.importedBooks.length} books`);
+    const books = await BookStorage.loadBooks(context, this.currentUser);
+    hilog.info(0x0000,TAG,`Index reloadData: loaded ${books.length} books`);
     this.progresses = await ProgressStorage.loadAllProgresses(context, this.currentUser);
     hilog.info(0x0000,TAG,`Index reloadData: loaded ${this.progresses.length} progresses`);
+    
+    // 建立 filePath 到 lastReadTime 的映射
+    const progressMap = new Map<string, number>();
+    this.progresses.forEach(p => {
+      progressMap.set(p.filePath, p.lastReadTime);
+    });
+    
+    // 按最后阅读时间降序排序（最近打开的在最上方）
+    this.importedBooks = books.sort((a, b) => {
+      const timeA = progressMap.get(a.getFilePath()) || 0;
+      const timeB = progressMap.get(b.getFilePath()) || 0;
+      return timeB - timeA; // 降序，最新的在前
+    });
     
     // 打印所有进度和书籍的filePath用于调试
     this.progresses.forEach((p, idx) => {
@@ -243,9 +256,22 @@ export struct Index {
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       // 重新加载书籍列表
-      this.importedBooks = await BookStorage.loadBooks(context,this.currentUser);
+      const books = await BookStorage.loadBooks(context,this.currentUser);
       // 重新加载进度
       this.progresses = await ProgressStorage.loadAllProgresses(context,this.currentUser);
+      
+      // 建立 filePath 到 lastReadTime 的映射
+      const progressMap = new Map<string, number>();
+      this.progresses.forEach(p => {
+        progressMap.set(p.filePath, p.lastReadTime);
+      });
+      
+      // 按最后阅读时间降序排序（最近打开的在最上方）
+      this.importedBooks = books.sort((a, b) => {
+        const timeA = progressMap.get(a.getFilePath()) || 0;
+        const timeB = progressMap.get(b.getFilePath()) || 0;
+        return timeB - timeA; // 降序，最新的在前
+      });
       
       // 如果有书籍，重新选中第一本
       if (this.importedBooks.length > 0) {
