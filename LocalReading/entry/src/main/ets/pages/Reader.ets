@@ -12,7 +12,7 @@ import { BookUtils } from '../utils/BookUtils';
 import { SettingStorage, PersistedReaderSettings } from '../common/SettingStorage';
 import { ProgressStorage, BookProgress} from '../common/ProgressStorage';
 import { emitter } from '@kit.BasicServicesKit';
-import {Speaker} from '../utils/Speaker'
+import { Speaker } from '../utils/Speaker'
 import { util } from '@kit.ArkTS';
 import { DistributedSyncManager } from '../utils/DistributedSyncManager';
 
@@ -651,8 +651,8 @@ struct Reader {
         return '';
       }
       // 同步读取文件（或使用异步 fs.readText，根据 API 版本）
-      // 鸿蒙提供 fs.readTextSync 或 fs.readText
-      const text = await fs.readText(filePath); // 假设有异步方法，如果不行改用同步
+      // 鸿蒙提供 fs.readTextSync 或 fs.readText都可以
+      const text = await fs.readText(filePath);
       return text || '';
     } catch (error) {
       hilog.error(0x0000, TAG, `readTextFromFile failed: ${error.message}`);

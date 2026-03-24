@@ -9,6 +9,7 @@ import { GlobalContext } from "@bundle:com.example.readerkitdemo/entry/ets/commo
 import type { StoredUserCredential } from './PasswordUtil';
 import { ProgressStorage } from "@bundle:com.example.readerkitdemo/entry/ets/common/ProgressStorage";
 import type { BookProgress } from "@bundle:com.example.readerkitdemo/entry/ets/common/ProgressStorage";
+import { ConflictResolver } from "@bundle:com.example.readerkitdemo/entry/ets/utils/ConflictResolver";
 const TAG = 'DistributedSyncManager';
 const SESSION_ID = 'local_reading_sync_v2'; // 固定sessionId，同账号设备自动同步
 // 同步数据结构
@@ -108,11 +109,22 @@ export class DistributedSyncManager {
                 const users: Record<string, StoredUserCredential> = JSON.parse(remoteUsersJson);
                 await StorageUtil.saveAllUsers(users);
             }
-            // 恢复设置
+            // 恢复设置（使用 ConflictResolver 处理冲突）
             const remoteSettingsJson = this.dataObject['settingsJson'] as string;
             if (remoteSettingsJson) {
-                const settings: PersistedReaderSettings = JSON.parse(remoteSettingsJson);
-                await SettingStorage.saveSettings(context, settings);
+                const remoteSettings: PersistedReaderSettings = JSON.parse(remoteSettingsJson);
+                const localSettings = await SettingStorage.loadSettings(context);
+                // 使用 ConflictResolver 解决设置冲突
+                const conflictResult = ConflictResolver.resolveSettingsConflict(localSettings, remoteSettings, ConflictResolver.getDefaultStrategy());
+                if (conflictResult.resolvedSettings) {
+                    await SettingStorage.saveSettings(context, conflictResult.resolvedSettings);
+                    if (conflictResult.conflict) {
+                        hilog.info(0x0000, TAG, `Settings conflict resolved: ${conflictResult.conflictInfo?.conflictType}`);
+                    }
+                    else {
+                        hilog.info(0x0000, TAG, 'Settings applied without conflict');
+                    }
+                }
             }
             // 恢复阅读进度
             const remoteProgressesJson = this.dataObject['progressesJson'] as string;
@@ -140,55 +152,18 @@ export class DistributedSyncManager {
     }
     /**
      * 合并远程阅读进度到本地
-     * 策略：对于相同书籍，取较新的阅读进度
+     * 使用 ConflictResolver 处理冲突
      */
     private async mergeReadingProgresses(context: common.UIAbilityContext, remoteProgresses: BookProgress[]): Promise<void> {
         try {
             const currentUser = await StorageUtil.getCurrentUser();
             const localProgresses = await ProgressStorage.loadAllProgresses(context, currentUser);
-            // 创建本地进度映射（按 bookIdentity 索引）
-            const localMap = new Map<string, BookProgress>();
-            for (const progress of localProgresses) {
-                if (progress.bookIdentity) {
-                    localMap.set(progress.bookIdentity, progress);
-                }
-            }
-            // 合并远程进度
-            for (const remoteProgress of remoteProgresses) {
-                if (!remoteProgress.bookIdentity)
-                    continue;
-                const localProgress = localMap.get(remoteProgress.bookIdentity);
-                if (!localProgress) {
-                    // 本地没有此书籍进度，直接添加（保留本地 filePath 为空，后续用户打开书籍时会更新）
-                    localMap.set(remoteProgress.bookIdentity, remoteProgress);
-                    hilog.info(0x0000, TAG, `Added new progress: ${remoteProgress.bookName}`);
-                }
-                else {
-                    // 本地有此书籍，比较时间戳，取较新的
-                    if (remoteProgress.lastReadTime > localProgress.lastReadTime) {
-                        // 远程更新，合并（保留本地 filePath）
-                        const merged: BookProgress = {
-                            bookIdentity: remoteProgress.bookIdentity,
-                            filePath: localProgress.filePath || remoteProgress.filePath,
-                            bookName: remoteProgress.bookName,
-                            author: remoteProgress.author,
-                            resourceIndex: remoteProgress.resourceIndex,
-                            startDomPos: remoteProgress.startDomPos,
-                            chapterName: remoteProgress.chapterName,
-                            lastReadTime: remoteProgress.lastReadTime
-                        };
-                        localMap.set(remoteProgress.bookIdentity, merged);
-                        hilog.info(0x0000, TAG, `Updated progress: ${remoteProgress.bookName}`);
-                    }
-                    else {
-                        hilog.info(0x0000, TAG, `Kept local progress: ${localProgress.bookName}`);
-                    }
-                }
-            }
+            hilog.info(0x0000, TAG, `Merging progresses: local=${localProgresses.length}, remote=${remoteProgresses.length}`);
+            // 使用 ConflictResolver 批量解决冲突
+            const mergedProgresses = ConflictResolver.resolveBatchProgressConflicts(localProgresses, remoteProgresses, ConflictResolver.getDefaultStrategy());
             // 保存合并后的进度
-            const mergedProgresses = Array.from(localMap.values());
             await ProgressStorage.saveAllProgresses(context, mergedProgresses, currentUser);
-            hilog.info(0x0000, TAG, `Merged ${mergedProgresses.length} reading progresses`);
+            hilog.info(0x0000, TAG, `Progresses merged: ${mergedProgresses.length} records after conflict resolution`);
         }
         catch (error) {
             const err = error as BusinessError;

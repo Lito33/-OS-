@@ -10,6 +10,7 @@ import { StoredUserCredential } from './PasswordUtil';
 import { picker } from '@kit.CoreFileKit';
 import { BookStorage } from '../common/BookStorage';
 import { ProgressStorage, BookProgress } from '../common/ProgressStorage';
+import { ConflictResolver } from './ConflictResolver';
 
 const TAG = 'SyncManager';
 
@@ -128,7 +129,7 @@ export class SyncManager {
       
       // 直接使用URI打开文件
       const file = fileIo.openSync(fileUri, fileIo.OpenMode.READ_ONLY);
-      const stat = fileIo.statSync(file.fd);
+      const stat = fileIo.statSync(file.fd);// 获取文件或目录的详细属性信息
       const buf = new ArrayBuffer(stat.size);
       fileIo.readSync(file.fd, buf);
       fileIo.closeSync(file);
@@ -145,9 +146,24 @@ export class SyncManager {
       // 恢复用户数据
       await StorageUtil.saveAllUsers(syncData.users);
       
-      // 恢复设置
+      // 恢复设置（使用 ConflictResolver 处理冲突）
       if (syncData.settings) {
-        await SettingStorage.saveSettings(context, syncData.settings);
+        const localSettings = await SettingStorage.loadSettings(context);
+        const conflictResult = ConflictResolver.resolveSettingsConflict(
+          localSettings,
+          syncData.settings,
+          ConflictResolver.getDefaultStrategy()
+        );
+        
+        if (conflictResult.resolvedSettings) {
+          await SettingStorage.saveSettings(context, conflictResult.resolvedSettings);
+          
+          if (conflictResult.conflict) {
+            hilog.info(0x0000, TAG, `Settings conflict resolved during import: ${conflictResult.conflictInfo?.conflictType}`);
+          } else {
+            hilog.info(0x0000, TAG, 'Settings imported without conflict');
+          }
+        }
       }
       
       // 设置当前用户
@@ -156,7 +172,7 @@ export class SyncManager {
       }
       
       // 恢复阅读进度（版本3.0及以上支持）
-      if (syncData.version >= '3.0' && syncData.progresses && syncData.progresses.length > 0) {
+      if (SyncManager.compareVersion(syncData.version, '3.0') >= 0 && syncData.progresses && syncData.progresses.length > 0) {
         await SyncManager.importProgresses(context, syncData.progresses, syncData.currentUser);
         hilog.info(0x0000, TAG, `导入阅读进度: ${syncData.progresses.length} 条`);
       } else {
@@ -175,10 +191,28 @@ export class SyncManager {
       return { success: false, message: `导入失败: ${error.message}` };
     }
   }
-  
+
   /**
-   * 导入阅读进度数据
-   * 合并策略：对于相同书籍，取较新的进度
+   * 比较版本号字符串
+   * @returns 1: v1 > v2, 0: v1 == v2, -1: v1 < v2
+   */
+  private static compareVersion(v1: string, v2: string): number {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    const maxLen = Math.max(parts1.length, parts2.length);
+
+    for (let i = 0; i < maxLen; i++) {
+      const num1 = parts1[i] || 0;
+      const num2 = parts2[i] || 0;
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+    }
+    return 0;
+  }
+
+  /**
+   * 导入阅读进度数据,合并策略：对于相同书籍，取较新的进度
+   * 使用 ConflictResolver 处理冲突
    */
   private static async importProgresses(
     context: common.UIAbilityContext,
@@ -194,51 +228,21 @@ export class SyncManager {
       
       // 获取当前用户的本地进度
       const localProgresses = await ProgressStorage.loadAllProgresses(context, currentUser);
-      const localMap = new Map<string, BookProgress>();
       
-      for (const progress of localProgresses) {
-        if (progress.bookIdentity) {
-          localMap.set(progress.bookIdentity, progress);
-        }
-      }
+      hilog.info(0x0000, TAG, `Importing progresses: local=${localProgresses.length}, imported=${importedProgresses.length}`);
       
-      // 合并导入的进度
-      let addedCount = 0;
-      let updatedCount = 0;
-      
-      for (const importedProgress of importedProgresses) {
-        if (!importedProgress.bookIdentity) continue;
-        
-        const localProgress = localMap.get(importedProgress.bookIdentity);
-        
-        if (!localProgress) {
-          // 本地没有此书籍进度，直接添加
-          localMap.set(importedProgress.bookIdentity, importedProgress);
-          addedCount++;
-        } else {
-          // 本地有此书籍，比较时间戳，取较新的
-          if (importedProgress.lastReadTime > localProgress.lastReadTime) {
-            // 导入的更新，合并（保留本地 filePath）
-            const merged: BookProgress = {
-              bookIdentity: importedProgress.bookIdentity,
-              filePath: localProgress.filePath || importedProgress.filePath,
-              bookName: importedProgress.bookName,
-              author: importedProgress.author,
-              resourceIndex: importedProgress.resourceIndex,
-              startDomPos: importedProgress.startDomPos,
-              chapterName: importedProgress.chapterName,
-              lastReadTime: importedProgress.lastReadTime
-            };
-            localMap.set(importedProgress.bookIdentity, merged);
-            updatedCount++;
-          }
-        }
-      }
+      // 使用 ConflictResolver 批量解决冲突
+      const mergedProgresses = ConflictResolver.resolveBatchProgressConflicts(
+        localProgresses,
+        importedProgresses,
+        ConflictResolver.getDefaultStrategy()
+      );
       
       // 保存合并后的进度
-      const mergedProgresses = Array.from(localMap.values());
       await ProgressStorage.saveAllProgresses(context, mergedProgresses, currentUser);
       
+      const addedCount = mergedProgresses.length - localProgresses.length;
+      const updatedCount = mergedProgresses.length - addedCount;
       hilog.info(0x0000, TAG, `阅读进度合并完成: 新增 ${addedCount} 条, 更新 ${updatedCount} 条`);
       
     } catch (error) {
@@ -288,3 +292,7 @@ export class SyncManager {
   }
   
   }
+
+
+
+

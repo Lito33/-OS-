@@ -26,6 +26,7 @@ class NotePreferenceModel {
       try {
         let t: NoteData = JSON.parse(v);
         ret.push(t);//把遍历到的全部push进去
+
       } catch (e) {
         console.log("getAllPreference error:", e);
       }

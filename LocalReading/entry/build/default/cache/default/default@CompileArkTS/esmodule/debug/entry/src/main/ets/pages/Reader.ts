@@ -949,8 +949,8 @@ class Reader extends ViewPU {
                 return '';
             }
             // 同步读取文件（或使用异步 fs.readText，根据 API 版本）
-            // 鸿蒙提供 fs.readTextSync 或 fs.readText
-            const text = await fs.readText(filePath); // 假设有异步方法，如果不行改用同步
+            // 鸿蒙提供 fs.readTextSync 或 fs.readText都可以
+            const text = await fs.readText(filePath);
             return text || '';
         }
         catch (error) {

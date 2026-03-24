@@ -115,7 +115,8 @@
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncSettings.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\DeviceManagement.ets",
-        "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\kits\\@kit.PerformanceAnalysisKit.d.ts"
+        "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\kits\\@kit.PerformanceAnalysisKit.d.ts",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\ConflictResolver.ets"
       ],
       "error": false
     },
@@ -1845,7 +1846,8 @@
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\Reader.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\ReadingRecord.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets",
-        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncTest.ets"
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncTest.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\ConflictResolver.ets"
       ],
       "error": true,
       "errorCodes": [
@@ -1853,7 +1855,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\SettingStorage.ets": {
-      "mtimeMs": 1774167553512.718,
+      "mtimeMs": 1774168694072.7102,
       "children": [
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.data.preferences.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.app.ability.common.d.ts"
@@ -1863,12 +1865,13 @@
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\SyncManager.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\Reader.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets",
-        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncTest.ets"
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncTest.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\ConflictResolver.ets"
       ],
       "error": false
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\SyncManager.ets": {
-      "mtimeMs": 1773760749633.5073,
+      "mtimeMs": 1774328643366.7236,
       "children": [
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.file.fs.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.app.ability.common.d.ts",
@@ -1880,7 +1883,8 @@
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\PasswordUtil.ets",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.file.picker.d.ts",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\BookStorage.ets",
-        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\ProgressStorage.ets"
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\ProgressStorage.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\ConflictResolver.ets"
       ],
       "parent": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\CloudSyncService.ets",
@@ -2344,7 +2348,7 @@
       "error": false
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\exfeature\\note\\src\\main\\ets\\model\\NotePreferenceModel.ets": {
-      "mtimeMs": 1750159478000,
+      "mtimeMs": 1774241585536.4258,
       "children": [
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.data.preferences.d.ts",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\exfeature\\note\\src\\main\\ets\\viewmodel\\NoteData.ets"
@@ -2395,7 +2399,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\Reader.ets": {
-      "mtimeMs": 1774167661832.9272,
+      "mtimeMs": 1774169787769.698,
       "children": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\entryability\\WindowAbility.ets",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.display.d.ts",
@@ -2491,7 +2495,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncSettings.ets": {
-      "mtimeMs": 1774006534644.1528,
+      "mtimeMs": 1774244308350.9426,
       "children": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\SyncManager.ets",
@@ -3022,7 +3026,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets": {
-      "mtimeMs": 1774093030566.9817,
+      "mtimeMs": 1774272669101.4275,
       "children": [
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.data.distributedDataObject.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.app.ability.common.d.ts",
@@ -3032,7 +3036,8 @@
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\SettingStorage.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\GlobalContext.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\PasswordUtil.ets",
-        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\ProgressStorage.ets"
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\ProgressStorage.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\ConflictResolver.ets"
       ],
       "parent": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\entryability\\EntryAbility.ets",
@@ -4246,6 +4251,19 @@
       "children": [],
       "parent": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\entryability\\EntryAbility.ets"
+      ],
+      "error": false
+    },
+    "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\ConflictResolver.ets": {
+      "mtimeMs": 1774330087898.218,
+      "children": [
+        "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.hilog.d.ts",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\ProgressStorage.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\SettingStorage.ets"
+      ],
+      "parent": [
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\SyncManager.ets"
       ],
       "error": false
     }
