@@ -114,8 +114,6 @@ struct Reader {
   }
   //主题
   @State themeSelectIndex: number = 0;
-  //标记是否为用户手动选择的主题（优先级高于系统颜色模式）
-  @State isUserSelectedTheme: boolean = false;
 //阅读相关设置
   private readerSetting: readerCore.ReaderSetting = {
     fontName: BookUtils.getString(this.getUIContext().getHostContext(), 'system_font'),
@@ -163,11 +161,6 @@ struct Reader {
       this.fontSize = saved.fontSize.toString();
       this.lineHeight = saved.lineHeight.toString();
       
-      // 如果用户之前选择过非默认主题，标记为用户手动选择
-      if (saved.themeSelectIndex > 0) {
-        this.isUserSelectedTheme = true;
-      }
-
       // 根据主题索引调整字体颜色（优先使用保存的fontColor，否则根据themeSelectIndex推断）
       if (saved.fontColor) {
         this.readerSetting.fontColor = saved.fontColor;
@@ -240,12 +233,7 @@ struct Reader {
 
   //系统颜色改变
   colorModeChange() {
-    // 如果用户手动选择了主题，则不响应系统颜色模式变化
-    if (this.isUserSelectedTheme) {
-      hilog.info(0x0000, TAG, 'colorModeChange: user selected theme, skip auto change');
-      return;
-    }
-    
+    // 移除用户手动选择主题的判断，确保主题切换时字体颜色能够正确更新
     if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
       this.readerSetting.nightMode = true;
       this.readerSetting.fontColor = '#ffffff';
@@ -970,7 +958,6 @@ struct Reader {
               const currentDomPos = this.currentData?.startDomPos ?? '';
 
               this.themeSelectIndex = index;
-              this.isUserSelectedTheme = true; // 标记为用户手动选择主题
               this.readerSetting.themeColor = this.THEME_PAGE_COLOR[item];
               this.readerSetting.nightMode = false;
               if (index === 5) {
