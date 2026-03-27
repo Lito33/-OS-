@@ -172,13 +172,13 @@ struct Reader {
       } else {
         // 兼容旧数据：根据主题索引推断字体颜色
         hilog.info(0x0000, TAG, `No valid fontColor saved, inferring from themeSelectIndex: ${saved.themeSelectIndex}`);
-        if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
-          // 系统深色模式：使用白色字体
+        if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6){
+          // 深色主题（dark 或 darkSky）：使用白色字体
           this.readerSetting.fontColor = '#ffffff';
           this.readerSetting.nightMode = true;
-        } else {
-          // 系统浅色模式：根据主题索引设置字体颜色
-          if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6) {
+        }else {
+          // 浅色主题：根据系统颜色模式决定
+          if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
             this.readerSetting.fontColor = '#ffffff';
             this.readerSetting.nightMode = true;
           } else {
@@ -766,10 +766,11 @@ struct Reader {
                 Row() {
                   Text(' · ')
                     .fontSize(14)
-                    .fontColor($r('app.color.black_90_opacity'))
+                    .fontColor(this.isCurrentChapter(item) ? $r('app.color.blue') : $r('app.color.black_90_opacity'))
                   Text(item.catalogName)
                     .fontSize(14)
-                    .fontColor($r('app.color.black_90_opacity'))
+                    .fontColor(this.isCurrentChapter(item) ? $r('app.color.blue') : $r('app.color.black_90_opacity'))
+                    .fontWeight(this.isCurrentChapter(item) ? FontWeight.Bold : FontWeight.Normal)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .padding({ top: 8, bottom: 8 })
                     .maxLines(2)
@@ -1410,6 +1411,15 @@ struct Reader {
       hilog.info(0x0000, TAG, `getDomPos failed, Code: ${error.code}, message: ${error.message}`);
     }
     return Promise.reject();
+  }
+
+  // 判断某个目录项是否是当前所在章节
+  private isCurrentChapter(catalogItem: bookParser.CatalogItem): boolean {
+    if (!this.currentData || this.currentData.resourceIndex < 0) {
+      return false;
+    }
+    const resourceItem = this.getResourceItemByCatalog(catalogItem);
+    return resourceItem.index === this.currentData.resourceIndex;
   }
 
   //更具传入的目录项查找并返回对应的资源项，用于定位和加载内容

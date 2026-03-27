@@ -499,14 +499,14 @@ class Reader extends ViewPU {
             else {
                 // 兼容旧数据：根据主题索引推断字体颜色
                 hilog.info(0x0000, TAG, `No valid fontColor saved, inferring from themeSelectIndex: ${saved.themeSelectIndex}`);
-                if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
-                    // 系统深色模式：使用白色字体
+                if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6) {
+                    // 深色主题（dark 或 darkSky）：使用白色字体
                     this.readerSetting.fontColor = '#ffffff';
                     this.readerSetting.nightMode = true;
                 }
                 else {
-                    // 系统浅色模式：根据主题索引设置字体颜色
-                    if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6) {
+                    // 浅色主题：根据系统颜色模式决定
+                    if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
                         this.readerSetting.fontColor = '#ffffff';
                         this.readerSetting.nightMode = true;
                     }
@@ -1122,13 +1122,14 @@ class Reader extends ViewPU {
                         this.observeComponentCreation2((elmtId, isInitialRender) => {
                             Text.create(' · ');
                             Text.fontSize(14);
-                            Text.fontColor({ "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                            Text.fontColor(this.isCurrentChapter(item) ? { "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
                         }, Text);
                         Text.pop();
                         this.observeComponentCreation2((elmtId, isInitialRender) => {
                             Text.create(item.catalogName);
                             Text.fontSize(14);
-                            Text.fontColor({ "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                            Text.fontColor(this.isCurrentChapter(item) ? { "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                            Text.fontWeight(this.isCurrentChapter(item) ? FontWeight.Bold : FontWeight.Normal);
                             Text.textOverflow({ overflow: TextOverflow.Ellipsis });
                             Text.padding({ top: 8, bottom: 8 });
                             Text.maxLines(2);
@@ -1721,7 +1722,7 @@ class Reader extends ViewPU {
                                 hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
                             }
                         }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1243, col: 7 });
+                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1244, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {
@@ -1957,6 +1958,14 @@ class Reader extends ViewPU {
             hilog.info(0x0000, TAG, `getDomPos failed, Code: ${error.code}, message: ${error.message}`);
         }
         return Promise.reject();
+    }
+    // 判断某个目录项是否是当前所在章节
+    private isCurrentChapter(catalogItem: bookParser.CatalogItem): boolean {
+        if (!this.currentData || this.currentData.resourceIndex < 0) {
+            return false;
+        }
+        const resourceItem = this.getResourceItemByCatalog(catalogItem);
+        return resourceItem.index === this.currentData.resourceIndex;
     }
     //更具传入的目录项查找并返回对应的资源项，用于定位和加载内容
     private getResourceItemByCatalog(catalogItem: bookParser.CatalogItem): bookParser.SpineItem {
