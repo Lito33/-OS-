@@ -17,7 +17,8 @@ export interface BookProgress {
 
 export class ProgressStorage {
   private static getStoreName(account?: string): string {
-    return account ? `reader_progress_${account}` : 'reader_progress_default';
+    // 只有当 account 是有效的非空字符串时才使用用户专属存储
+    return (account && account.length > 0) ? `reader_progress_${account}` : 'reader_progress_default';
   }
 
   static async saveAllProgresses(

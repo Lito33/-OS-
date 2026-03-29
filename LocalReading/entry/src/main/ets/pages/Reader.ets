@@ -63,6 +63,7 @@ struct Reader {
   @State bookCover: PixelMap | null = null;
   @State bookTitle: string = '';
   @State author: string = '';
+  @State loadError: string = ''; // 加载错误信息
   @State fontSize: string = '18';
   @State lineHeight: string = '';
   //初始化字体列表
@@ -132,100 +133,164 @@ struct Reader {
   };
   //自定义的回调函数，用作屏幕变化事件的处理器
   private screenDensityCallBack: Callback<number> | null = null;
-  @State isLoading: boolean = true;
+  @State isLoading: boolean = false;
 
   private bookFilePath: string = '';
 
   async aboutToAppear(): Promise<void> {
-    hilog.info(0x0000, TAG, 'aboutToAppear');
+    hilog.info(0x0000, TAG, 'aboutToAppear Start');
     this.registerScreenDensityChange();
     this.registerListener();
     WindowAbility.getInstance().toggleWindowSystemBar([], this.getUIContext().getHostContext());
 
+    // 等待窗口尺寸初始化完成（最多等待500ms）
+    const maxWaitTime = 500;
+    const startTime = Date.now();
+    while ((this.windowWidth === 0 || this.windowHeight === 0) && (Date.now() - startTime) < maxWaitTime) {
+      await new Promise<void>(resolve => setTimeout(resolve, 50));
+    }
+    hilog.info(0x0000, TAG, `aboutToAppear: windowSize = ${this.windowWidth}x${this.windowHeight}`);
+    
+    // 更新readerSetting的视口尺寸
+    if (this.windowWidth > 0 && this.windowHeight > 0) {
+      this.readerSetting.viewPortWidth = this.windowWidth;
+      this.readerSetting.viewPortHeight = this.windowHeight;
+    }
+
     //加载保存的设置
+    hilog.info(0x0000, TAG, 'aboutToAppear: loading settings...');
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     const saved = await SettingStorage.loadSettings(context);
-    if (saved) {
-      // 更新阅读器配置
-      this.readerSetting.fontPath = saved.fontPath;
-      this.readerSetting.fontSize = saved.fontSize;
-      this.readerSetting.lineHeight = saved.lineHeight;
-      this.readerSetting.nightMode = saved.nightMode;
-      this.readerSetting.themeColor = saved.themeColor;
-      this.readerSetting.themeBgImg = saved.themeBgImg;
-      this.readerSetting.flipMode = saved.flipMode;
-      this.themeSelectIndex = saved.themeSelectIndex;
+    hilog.info(0x0000, TAG, `aboutToAppear: settings loaded, saved=${saved !== null}`);
 
-      // 更新 UI 状态变量
-      this.selectFontPath = saved.fontPath;
-      this.fontSize = saved.fontSize.toString();
-      this.lineHeight = saved.lineHeight.toString();
-      
-      // 优先使用保存的字体颜色和夜间模式设置
-      // 如果保存的设置中有有效的 fontColor（非空字符串），直接使用
-      // themeList: ['white', 'yellow', 'pink', 'green', 'dark', 'whiteSky', 'darkSky']
-      // index 4 (dark), 6 (darkSky) 需要白色字体
-      if (saved.fontColor && saved.fontColor.length > 0) {
-        this.readerSetting.fontColor = saved.fontColor;
-        this.readerSetting.nightMode = saved.nightMode;
-        hilog.info(0x0000, TAG, `Using saved fontColor: ${saved.fontColor}, nightMode: ${saved.nightMode}`);
-      } else {
-        // 兼容旧数据：根据主题索引推断字体颜色
-        hilog.info(0x0000, TAG, `No valid fontColor saved, inferring from themeSelectIndex: ${saved.themeSelectIndex}`);
-        if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6){
-          // 深色主题（dark 或 darkSky）：使用白色字体
-          this.readerSetting.fontColor = '#ffffff';
-          this.readerSetting.nightMode = true;
-        }else {
-          // 浅色主题：根据系统颜色模式决定
-          if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
+    //************************************************
+    // 检查 UIContext
+    const uiContext = this.getUIContext();
+    if (!uiContext) {
+      hilog.error(0x0000, TAG, 'aboutToAppear: getUIContext is null');
+      this.loadError = 'UI上下文异常';
+      return;
+    }
+
+    const router = uiContext.getRouter();
+    if (!router) {
+      hilog.error(0x0000, TAG, 'aboutToAppear: router is null');
+      this.loadError = '路由异常';
+      return;
+    }
+
+    //************************************************
+
+    try {
+      if (saved) {
+        // 更新阅读器配置
+        this.readerSetting.fontPath = saved.fontPath ?? '';
+        this.readerSetting.fontSize = saved.fontSize ?? 18;
+        this.readerSetting.lineHeight = saved.lineHeight ?? 1.9;
+        this.readerSetting.nightMode = saved.nightMode ?? false;
+        this.readerSetting.themeColor = saved.themeColor ?? 'rgba(248, 249, 250, 1)';
+        this.readerSetting.themeBgImg = saved.themeBgImg ?? '';
+        this.readerSetting.flipMode = saved.flipMode ?? '0';
+        this.themeSelectIndex = saved.themeSelectIndex ?? 0;
+
+        // 更新 UI 状态变量
+        this.selectFontPath = saved.fontPath  ?? '';
+        this.fontSize = (saved.fontSize ?? 18).toString();
+        this.lineHeight = (saved.lineHeight ?? 1.9).toString();
+
+        // 优先使用保存的字体颜色和夜间模式设置
+        // 如果保存的设置中有有效的 fontColor（非空字符串），直接使用
+        // themeList: ['white', 'yellow', 'pink', 'green', 'dark', 'whiteSky', 'darkSky']
+        // index 4 (dark), 6 (darkSky) 需要白色字体
+        if (saved.fontColor && saved.fontColor.length > 0) {
+          this.readerSetting.fontColor = saved.fontColor;
+          this.readerSetting.nightMode = saved.nightMode;
+          hilog.info(0x0000, TAG, `Using saved fontColor: ${saved.fontColor}, nightMode: ${saved.nightMode}`);
+        } else {
+          // 兼容旧数据：根据主题索引推断字体颜色
+          hilog.info(0x0000, TAG, `No valid fontColor saved, inferring from themeSelectIndex: ${saved.themeSelectIndex}`);
+          if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6){
+            // 深色主题（dark 或 darkSky）：使用白色字体
             this.readerSetting.fontColor = '#ffffff';
             this.readerSetting.nightMode = true;
-          } else {
-            this.readerSetting.fontColor = '#000000';
-            this.readerSetting.nightMode = false;
+          }else {
+            // 浅色主题：根据系统颜色模式决定
+            if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
+              this.readerSetting.fontColor = '#ffffff';
+              this.readerSetting.nightMode = true;
+            } else {
+              this.readerSetting.fontColor = '#000000';
+              this.readerSetting.nightMode = false;
+            }
           }
+          hilog.info(0x0000, TAG, `Inferred fontColor: ${this.readerSetting.fontColor}, nightMode: ${this.readerSetting.nightMode}`);
         }
-        hilog.info(0x0000, TAG, `Inferred fontColor: ${this.readerSetting.fontColor}, nightMode: ${this.readerSetting.nightMode}`);
+
+        // 加载TTS朗读设置
+        if (saved.ttsVolume !== undefined) {
+          this.ttsVolume = saved.ttsVolume;
+          this.speaker.setVolume(this.ttsVolume);
+        } else {
+          this.ttsVolume = 1.0;
+        }
+        if (saved.ttsPitch !== undefined) {
+          this.ttsPitch = saved.ttsPitch;
+          this.speaker.setPitch(this.ttsPitch);
+        } else {
+          this.ttsPitch = 1.0;
+        }
+        if (saved.ttsSpeed !== undefined) {
+          this.ttsSpeed = saved.ttsSpeed;
+          this.speaker.setSpeed(this.ttsSpeed);
+        } else {
+          this.ttsSpeed = 1.0;
+        }
+
+        // 如果保存的字体路径在字体列表中，可能需要高亮（字体选择按钮已经通过 selectFontPath 处理）
       }
 
-      // 加载TTS朗读设置
-      if (saved.ttsVolume !== undefined) {
-        this.ttsVolume = saved.ttsVolume;
-        this.speaker.setVolume(this.ttsVolume);
+      //获取路由参数启动阅读器！
+      hilog.info(0x0000, TAG, `========== aboutToAppear: Getting Router Params ==========`);
+      hilog.info(0x0000, TAG, 'aboutToAppear: before getRouterParams');
+      let param = this.getUIContext().getRouter().getParams() as paramType;
+      hilog.info(0x0000, TAG, `aboutToAppear: param exists = ${param !== null && param !== undefined}`);
+
+      let filePath = param?.filePath ?? '';
+      let resourceIndex = param?.resourceIndex ?? 0;
+      let domPos = param?.domPos ?? '';
+
+      hilog.info(0x0000, TAG, `aboutToAppear: filePath=${filePath}`);
+      hilog.info(0x0000, TAG, `aboutToAppear: filePath length=${filePath?.length}`);
+      hilog.info(0x0000, TAG, `aboutToAppear: resourceIndex=${resourceIndex}, domPos=${domPos}`);
+
+      // 优先使用从参数传递的书籍信息（解决TXT文件bookIdentity都是"_"的问题）
+      if (param.bookName) {
+        this.bookTitle = param.bookName;
+        hilog.info(0x0000, TAG, `aboutToAppear: using bookName from params: ${param.bookName}`);
       }
-      if (saved.ttsPitch !== undefined) {
-        this.ttsPitch = saved.ttsPitch;
-        this.speaker.setPitch(this.ttsPitch);
-      }
-      if (saved.ttsSpeed !== undefined) {
-        this.ttsSpeed = saved.ttsSpeed;
-        this.speaker.setSpeed(this.ttsSpeed);
+      if (param.bookAuthor) {
+        this.author = param.bookAuthor;
+        hilog.info(0x0000, TAG, `aboutToAppear: using bookAuthor from params: ${param.bookAuthor}`);
       }
 
-      // 如果保存的字体路径在字体列表中，可能需要高亮（字体选择按钮已经通过 selectFontPath 处理）
+      this.bookFilePath = param.filePath; // 先保存文件路径，startPlay 中会用到
+      hilog.info(0x0000, TAG, `aboutToAppear: bookFilePath set to ${this.bookFilePath}`);
+
+      try {
+        await this.startPlay(filePath, resourceIndex, domPos);
+        hilog.info(0x0000, TAG, 'aboutToAppear: startPlay completed successfully');
+      } catch (err) {
+        hilog.error(0x0000, TAG, `aboutToAppear startPlay failed：${err}`);
+        this.loadError = '打开书籍失败';
+      }
+
+    }catch (error){
+      hilog.error(0x0000, TAG, `aboutToAppear: error - ${error}`);
+      this.loadError = `加载失败: ${error.message || '未知错误'}`;
     }
 
-    //获取路由参数启动阅读器！
-    let param = this.getUIContext().getRouter().getParams() as paramType;
-    let filePath = param.filePath;
-    let resourceIndex = param.resourceIndex;
-    let domPos = param.domPos;
     
-    // 优先使用从参数传递的书籍信息（解决TXT文件bookIdentity都是"_"的问题）
-    if (param.bookName) {
-      this.bookTitle = param.bookName;
-      hilog.info(0x0000, TAG, `aboutToAppear: using bookName from params: ${param.bookName}`);
-    }
-    if (param.bookAuthor) {
-      this.author = param.bookAuthor;
-      hilog.info(0x0000, TAG, `aboutToAppear: using bookAuthor from params: ${param.bookAuthor}`);
-    }
-    
-    this.startPlay(filePath, resourceIndex, domPos).catch(() => {
-      hilog.error(0x0000, TAG, `aboutToAppear startPlay failed`);
-    });
-    this.bookFilePath = param.filePath; // 保存文件路径
+
 
     //预加载
     emitter.on("eventId", () => {
@@ -425,38 +490,116 @@ struct Reader {
 
   //以指定阅读进度打开书籍，初始化阅读器页面。阅读器启动的统一入口
   private async startPlay(path: string, resourceIndex: number, domPos: string) {
+    hilog.info(0x0000, TAG, `========== startPlay BEGIN ==========`);
+    hilog.info(0x0000, TAG, `startPlay: path=${path}`);
+    hilog.info(0x0000, TAG, `startPlay: path length=${path?.length}, path type=${typeof path}`);
+    hilog.info(0x0000, TAG, `startPlay: resourceIndex=${resourceIndex}, domPos=${domPos}`);
+    
     try {
 
+      // 验证文件路径
+      if (!path || path.length === 0) {
+        hilog.error(0x0000, TAG, 'startPlay: filePath is empty');
+        this.loadError = '文件路径无效';
+        return;
+      }
+
+      // 验证文件是否存在
+      try {
+        const stat = fs.statSync(path);
+        hilog.info(0x0000, TAG, `startPlay: file exists, size=${stat.size}`);
+      } catch (e) {
+        hilog.error(0x0000, TAG, `startPlay: file not found: ${path}`);
+        hilog.error(0x0000, TAG, `startPlay: stat error: ${JSON.stringify(e)}`);
+        this.loadError = '书籍文件不存在或已被删除';
+        return;
+      }
+
+
       let context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      hilog.info(0x0000, TAG, `startPlay: context obtained, path=${path}`);
+      
      //调用阅读器控制器的初始化方法，传入上下文，准备阅读环境。
-      let initPromise: Promise<void> = this.readerComponentController.init(context).catch(() => {
-        // TODO: Implement error handling.
+      let initPromise: Promise<void> = this.readerComponentController.init(context).catch((err: BusinessError) => {
+        hilog.error(0x0000, TAG, `startPlay: readerComponentController.init failed: ${err?.message}`);
       });
+      
       //通过书籍解析器工厂（bookParser.getDefaultHandler）根据文件路径获取对应的解析器处理器（例如针对TXT、EPUB等不同格式的解析器）
-      let defaultHandler: Promise<bookParser.BookParserHandler> = bookParser.getDefaultHandler(path);
+      let defaultHandler: Promise<bookParser.BookParserHandler | null> = bookParser.getDefaultHandler(path)
+        .then((handler) => {
+          hilog.info(0x0000, TAG, `startPlay: getDefaultHandler success, handler=${handler !== null}`);
+          return handler;
+        })
+        .catch((err: BusinessError) => {
+          hilog.error(0x0000, TAG, `startPlay: getDefaultHandler failed, Code: ${err?.code}, message: ${err?.message}`);
+          return null;
+        });
+      
       //Promise.all同时执行两个异步任务，提高效率.result[0]为解析器处理器，result[1]为init完成信号（void）。
-      let result: [bookParser.BookParserHandler, void] = await Promise.all([defaultHandler, initPromise]);
+      let result: [bookParser.BookParserHandler | null, void] = await Promise.all([defaultHandler, initPromise]);
 
       //将获取到的解析器处理器保存到实例变量，供后续使用
       this.defaultHandler = result[0];
+      
+      // 验证解析器是否成功获取
+      if (!this.defaultHandler) {
+        hilog.error(0x0000, TAG, 'startPlay: defaultHandler is null, cannot continue');
+        this.loadError = '无法解析书籍文件，请检查文件格式是否正确';
+        return;
+      }
+      
       //将解析器注册到阅读器控制器，这样控制器就能通过解析器获取书籍章节内容。
       this.readerComponentController.registerBookParser(this.defaultHandler);
+      hilog.info(0x0000, TAG, 'startPlay: registerBookParser completed');
+      
+      // 确保视口尺寸正确后再设置页面配置
+      if (this.windowWidth > 0 && this.windowHeight > 0) {
+        this.readerSetting.viewPortWidth = this.windowWidth;
+        this.readerSetting.viewPortHeight = this.windowHeight;
+      }
+      hilog.info(0x0000, TAG, `startPlay: readerSetting viewPort=${this.readerSetting.viewPortWidth}x${this.readerSetting.viewPortHeight}`);
+      
       this.readerComponentController.setPageConfig(this.readerSetting);
+      
+      // 获取书籍信息（标题、作者、封面）- 必须在startPlay之前调用
+      await this.getBookInfo();
+      
+      // 预加载目录列表（避免点击目录时才加载导致延迟）
+      try {
+        this.catalogItemList = this.defaultHandler?.getCatalogList() || [];
+        hilog.info(0x0000, TAG, `startPlay: catalogItemList loaded, length=${this.catalogItemList.length}`);
+      } catch (e) {
+        hilog.error(0x0000, TAG, `startPlay: getCatalogList failed: ${e}`);
+      }
+      
       //启动阅读，跳转到指定章节并定位到domPos指定的文档位置。
-      this.readerComponentController.startPlay(resourceIndex || 0, domPos).catch(() => {});
+      try {
+        await this.readerComponentController.startPlay(resourceIndex || 0, domPos);
+        hilog.info(0x0000, TAG, 'startPlay: readerComponentController.startPlay completed');
+      } catch (err) {
+        hilog.error(0x0000, TAG, `startPlay: readerComponentController.startPlay failed: ${err}`);
+      }
       // 立即加载当前页文本（因为 startPlay 可能不会触发 pageShow 立即更新）
       await this.loadCurrentPageText(resourceIndex || 0);
+
+      // 加载成功，清除错误状态
+      this.loadError = '';
+
     } catch (error) {
       hilog.error(0x0000, TAG, `startPlay failed, Code: ${error.code}, message: ${error.message}`);
+      this.loadError = `加载失败: ${error.message || '未知错误'}`;
     }
   }
 
   //获取书籍信息//从书籍解析器处理器中获取并解析书籍的元信息（书名、作者）和封面图片
   private async getBookInfo() {
     try {
+      hilog.info(0x0000, TAG, `getBookInfo: defaultHandler exists = ${this.defaultHandler !== null}`);
       //通过 defaultHandler（书籍解析器）调用 getBookInfo() 获得一个包含书名、作者、封面资源标识等信息的 BookInfo 对象
       let bookInfo: bookParser.BookInfo | undefined = this.defaultHandler?.getBookInfo();
+      hilog.info(0x0000, TAG, `getBookInfo: bookInfo exists = ${bookInfo !== undefined}`);
       if (bookInfo) {
+        hilog.info(0x0000, TAG, `getBookInfo: bookInfo.bookTitle=${bookInfo.bookTitle}, bookInfo.bookCreator=${bookInfo.bookCreator}`);
         // 只有当bookTitle和author为空时，才从bookInfo中获取（避免覆盖从参数传递的值）
         if (!this.bookTitle && bookInfo.bookTitle) {
           this.bookTitle = bookInfo.bookTitle;
@@ -464,14 +607,20 @@ struct Reader {
         if (!this.author && bookInfo?.bookCreator) {
           this.author = bookInfo.bookCreator;
         }
-        //获取并解码封面图片
-        //调用解析器的 getResourceContent 方法，传入-1封面资源的标识（如路径），获得封面图片的二进制数据
-        let buffer = this.defaultHandler?.getResourceContent(-1, bookInfo.bookCoverImage);
-        //将二进制数据转换为 ImageSource 对象
-        let imageSource: image.ImageSource = image.createImageSource(buffer);
-        //从 ImageSource 创建可用于 UI 显示的 PixelMap（像素图），并保存到组件变量 this.bookCover 中。
-        this.bookCover = await imageSource.createPixelMap();
-        imageSource.release();
+        //获取并解码封面图片（封面加载失败不影响其他功能）
+        try {
+          //调用解析器的 getResourceContent 方法，传入-1封面资源的标识（如路径），获得封面图片的二进制数据
+          let buffer = this.defaultHandler?.getResourceContent(-1, bookInfo.bookCoverImage);
+          if (buffer && buffer.byteLength > 0) {
+            //将二进制数据转换为 ImageSource 对象
+            let imageSource: image.ImageSource = image.createImageSource(buffer);
+            //从 ImageSource 创建可用于 UI 显示的 PixelMap（像素图），并保存到组件变量 this.bookCover 中。
+            this.bookCover = await imageSource.createPixelMap();
+            imageSource.release();
+          }
+        } catch (coverError) {
+          hilog.warn(0x0000, TAG, `getBookInfo: cover load failed, but continue: ${coverError.message}`);
+        }
       }
       hilog.info(0x0000, TAG, `getBookInfo: bookTitle=${this.bookTitle}, author=${this.author}`);
     } catch (error) {
@@ -1247,6 +1396,28 @@ struct Reader {
 
   build() {
     Stack() {
+      // 加载错误提示（放在最外层，覆盖所有内容）
+      if (this.loadError) {
+        Column() {
+          Text('无法打开书籍')
+            .fontSize(20)
+            .fontColor('#FF0000')
+            .margin({ bottom: 16 })
+          Text(this.loadError)
+            .fontSize(16)
+            .fontColor('#666666')
+            .margin({ bottom: 24 })
+          Button('返回书架')
+            .onClick(() => {
+              this.getUIContext().getRouter().back();
+            })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(Color.White)
+        .zIndex(10) // 确保在最上层
+      } else {
       //阅读内容展示,交互场景化组件
       ReadPageComponent({
         controller: this.readerComponentController,
@@ -1293,6 +1464,7 @@ struct Reader {
 
       //menu bar
       if (this.currentIndex >= 0) {
+
         //外层遮罩：全屏，半透明背景，点击关闭
         Column() {
           //内部菜单容器：实际内容：目录/设置 + 底部按钮
@@ -1340,18 +1512,28 @@ struct Reader {
         .onClick(() => this.closeModal())//点击遮罩关闭菜单
         .transition(TransitionEffect.translate({ y: '100%' }).animation({ duration: 300, curve: Curve.EaseInOut }))
         .zIndex(2)
+
+      }
       }
 
-
-      Row() {
-        Text('加载中哦...')
+      // 加载指示器（仅在加载时显示）
+      if (this.isLoading) {
+        Column() {
+          LoadingProgress()
+            .width(50)
+            .height(50)
+            .color($r('app.color.blue'))
+          Text('正在加载书籍...')
+            .fontSize(16)
+            .fontColor('#666666')
+            .margin({ top: 16 })
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(Color.White)
+        .zIndex(5)
       }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .backgroundColor(Color.White)
-      .zIndex(3)
-      .visibility(this.isLoading ? Visibility.Visible : Visibility.None)
     }
     .width('100%').height('100%').onClick(() => {
       this.showModal();

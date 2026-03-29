@@ -34,15 +34,15 @@ export class LocalBookImporter {
     existingBooks?: BookParserInfo[]
   ): Promise<BookParserInfo> {
     hilog.info(0x0000, TAG, "importLocalBookToCache start", filePath);
+    hilog.info(0x0000, TAG, `importLocalBookToCache: workPath=${workPath}`);
     try {
-      if (!fs.accessSync(workPath)) {//如果不存在就创建一个路径
+      // workPath 已经是完整的导入目录路径，不需要再次调用 getBookFileLocalBookPath
+      let importPath = workPath;
+      if (!fs.accessSync(importPath)) {
         //创建目录
-        fs.mkdirSync(workPath);
+        fs.mkdirSync(importPath);
       }
-      let path = BookUtils.getBookFileLocalBookPath(workPath);
-      if (!fs.accessSync(path)) {
-        fs.mkdirSync(path);
-      }
+      hilog.info(0x0000, TAG, `importLocalBookToCache: importPath=${importPath}`);
       await this.checkFileValid(filePath);
 
       // 注意：重复检测改为在文件复制后进行，因为 hash.hash 不支持 URI
@@ -95,13 +95,16 @@ export class LocalBookImporter {
   private async handleLocalBookFileCache(filePath: string, workPath: string,
     bookParserInfo: BookParserInfo, existingBooks?: BookParserInfo[]): Promise<BookParserInfo> {
     try {
+      hilog.info(0x0000, TAG, `handleLocalBookFileCache: workPath=${workPath}, bookId=${bookParserInfo.getBookId()}`);
       let bookFilePath = BookUtils.getBookFileBasePath(workPath, bookParserInfo.getBookId());
+      hilog.info(0x0000, TAG, `handleLocalBookFileCache: bookFilePath=${bookFilePath}`);
       if (!fs.accessSync(bookFilePath)) {
         fs.mkdirSync(bookFilePath);
       }
       //构造完整文件路径
       let dstPath = bookFilePath + bookParserInfo.getBookName() + '.' +
       BookUtils.convertSourceTypeToSuffix(bookParserInfo.getBookSourceType());//将书籍来源类型（如 1TXT，2EPUB）转换为对应的文件扩展名字符串
+      hilog.info(0x0000, TAG, `handleLocalBookFileCache: dstPath=${dstPath}`);
 
       if (!fs.accessSync(dstPath)) {
         // 将图书文件复制到目标目录
@@ -127,9 +130,12 @@ export class LocalBookImporter {
         }
         
         bookParserInfo.setLocalHash(hashCode);
-        bookParserInfo.setFilePath(dstPath);
-        hilog.info(0x0000, TAG, 'handleLocalBookFileCache succeeded.');
       }
+      
+      // 无论文件是新复制的还是已存在的，都要设置 filePath
+      bookParserInfo.setFilePath(dstPath);
+      hilog.info(0x0000, TAG, `handleLocalBookFileCache succeeded, filePath=${dstPath}`);
+      
       return Promise.resolve(bookParserInfo);
     } catch (error) {
       hilog.error(0x0000, TAG,

@@ -8,6 +8,7 @@ interface LoginBottom_Params {
     isPasswordVisible?: boolean;
     passwordIconRes?: Resource;
     passwordController?: TextInputController;
+    loginResult?: LoginResult;
 }
 interface LoginTitle_Params {
 }
@@ -20,6 +21,11 @@ import { StorageUtil } from "@bundle:com.example.readerkitdemo/entry/ets/utils/S
 import hilog from "@ohos:hilog";
 import { DistributedSyncManager } from "@bundle:com.example.readerkitdemo/entry/ets/utils/DistributedSyncManager";
 const TAG: string = "Login";
+// 登录结果接口
+interface LoginResult {
+    success: boolean;
+    isRegister: boolean;
+}
 class Login extends ViewPU {
     constructor(parent, params, __localStorage, elmtId = -1, paramsLambda = undefined, extraInfo) {
         super(parent, __localStorage, elmtId, extraInfo);
@@ -75,7 +81,7 @@ class Login extends ViewPU {
                 if (isInitialRender) {
                     let componentCall = new 
                     // Title component
-                    LoginTitle(this, {}, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Login.ets", line: 30, col: 7 });
+                    LoginTitle(this, {}, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Login.ets", line: 36, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {};
@@ -92,7 +98,7 @@ class Login extends ViewPU {
                 if (isInitialRender) {
                     let componentCall = new 
                     // Bottom component
-                    LoginBottom(this, {}, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Login.ets", line: 32, col: 7 });
+                    LoginBottom(this, {}, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Login.ets", line: 38, col: 7 });
                     ViewPU.create(componentCall);
                     let paramsLambda = () => {
                         return {};
@@ -172,6 +178,7 @@ class LoginBottom extends ViewPU {
         this.__isPasswordVisible = new ObservedPropertySimplePU(false, this, "isPasswordVisible");
         this.__passwordIconRes = new ObservedPropertyObjectPU({ "id": 16777287, "type": 20000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" }, this, "passwordIconRes");
         this.passwordController = new TextInputController();
+        this.loginResult = { success: false, isRegister: false };
         this.setInitiallyProvidedValue(params);
         this.finalizeConstruction();
     }
@@ -193,6 +200,9 @@ class LoginBottom extends ViewPU {
         }
         if (params.passwordController !== undefined) {
             this.passwordController = params.passwordController;
+        }
+        if (params.loginResult !== undefined) {
+            this.loginResult = params.loginResult;
         }
     }
     updateStateVars(params: LoginBottom_Params) {
@@ -286,13 +296,16 @@ class LoginBottom extends ViewPU {
             console.error('Login: loadSavedUserInfo failed:', error);
         }
     }
+    //登录结果
+    private loginResult: LoginResult;
     //登录逻辑
-    private async simulateLogin(): Promise<boolean> {
+    private async simulateLogin(): Promise<void> {
         const account = this.account.trim();
         const password = this.password.trim();
         if (!account || !password) {
             promptAction.showToast({ message: '账号和密码不能为空', duration: 2000 });
-            return false;
+            this.loginResult = { success: false, isRegister: false };
+            return;
         }
         // 检查账号是否存在
         const isUserExists = await StorageUtil.userExists(account);
@@ -300,18 +313,17 @@ class LoginBottom extends ViewPU {
             // 账号存在，使用哈希验证密码
             const isPasswordValid = await StorageUtil.verifyPassword(account, password);
             if (isPasswordValid) {
-                return true; // 密码正确
+                this.loginResult = { success: true, isRegister: false }; // 登录成功
             }
             else {
                 promptAction.showToast({ message: '密码错误', duration: 2000 });
-                return false;
+                this.loginResult = { success: false, isRegister: false };
             }
         }
         else {
             // 账号不存在，视为注册：保存新用户（自动使用哈希存储）
             await StorageUtil.saveUser(account, password);
-            promptAction.showToast({ message: '注册成功，自动登录', duration: 2000 });
-            return true;
+            this.loginResult = { success: true, isRegister: true }; // 注册成功
         }
     }
     //切换密码可见性
@@ -436,9 +448,9 @@ class LoginBottom extends ViewPU {
             });
             Button.onClick(async () => {
                 console.info('Login: 点击登录按钮 - 账号:', this.account, '密码长度:', this.password.length, '记住密码:', this.isRememberPassword);
-                const isSuccess = await this.simulateLogin();
-                if (isSuccess) {
-                    // 登录成功：保存记住密码相关信息
+                await this.simulateLogin();
+                if (this.loginResult.success) {
+                    // 登录/注册成功：保存记住密码相关信息
                     console.info('Login: 登录成功，保存用户信息 - 账号:', this.account, '记住密码:', this.isRememberPassword);
                     // 根据记住密码状态保存信息
                     if (this.isRememberPassword) {
@@ -459,8 +471,9 @@ class LoginBottom extends ViewPU {
                     DistributedSyncManager.getInstance().syncData().then((success) => {
                         hilog.info(0x0000, TAG, `Data sync after login: ${success ? 'success' : 'failed'}`);
                     });
-                    // 显示登录成功提示
-                    promptAction.showToast({ message: '登录成功', duration: 1500 });
+                    // 根据是否为注册显示不同提示
+                    const message = this.loginResult.isRegister ? '注册成功' : '登录成功';
+                    promptAction.showToast({ message: message, duration: 1500 });
                     // 登录成功后返回到Tab页面
                     setTimeout(() => {
                         router.back();

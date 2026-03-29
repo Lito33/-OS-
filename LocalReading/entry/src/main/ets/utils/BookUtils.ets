@@ -65,12 +65,22 @@ export class BookUtils {
   }
 //构建书籍文件存储路径
   public static getBookFileBasePath(workPath: string, bookId: string): string {
-    return `${workPath}${bookId}/`;
+    // 移除末尾斜杠，统一处理
+    let basePath = workPath;
+    if (basePath.endsWith('/')) {
+      basePath = basePath.slice(0, -1);
+    }
+    return `${basePath}/${bookId}/`;
   }
 
   //根据传入路径生成该路径下import子目录的完整字符路径
   public static getBookFileLocalBookPath(workPath: string): string {
-    return `${workPath}import/`;
+    // 移除末尾斜杠，统一处理
+    let basePath = workPath;
+    if (basePath.endsWith('/')) {
+      basePath = basePath.slice(0, -1);
+    }
+    return `${basePath}/import/`;
   }
 
   //判断传入的文件后缀名是否在应用支持的扩展名列表，includes（）是否包含指定元素

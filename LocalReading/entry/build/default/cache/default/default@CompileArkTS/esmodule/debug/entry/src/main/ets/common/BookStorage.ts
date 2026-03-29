@@ -14,7 +14,8 @@ interface StoredBookInfo {
 export class BookStorage {
     // 根据用户账号获取存储名称
     private static getStoreName(account?: string): string {
-        return account ? `book_store_${account}` : 'book_store_default';
+        // 只有当 account 是有效的非空字符串时才使用用户专属存储
+        return (account && account.length > 0) ? `book_store_${account}` : 'book_store_default';
     }
     static async saveBooks(books: BookParserInfo[], context: common.UIAbilityContext, account?: string): Promise<void> {
         const storeName = BookStorage.getStoreName(account);

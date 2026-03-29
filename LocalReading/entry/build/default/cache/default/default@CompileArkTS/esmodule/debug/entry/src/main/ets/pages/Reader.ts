@@ -15,6 +15,7 @@ interface Reader_Params {
     bookCover?: PixelMap | null;
     bookTitle?: string;
     author?: string;
+    loadError?: string;
     fontSize?: string;
     lineHeight?: string;
     fontList?: Array<FontFileInfo>;
@@ -88,6 +89,7 @@ class Reader extends ViewPU {
         this.__bookCover = new ObservedPropertyObjectPU(null, this, "bookCover");
         this.__bookTitle = new ObservedPropertySimplePU('', this, "bookTitle");
         this.__author = new ObservedPropertySimplePU('', this, "author");
+        this.__loadError = new ObservedPropertySimplePU('', this, "loadError");
         this.__fontSize = new ObservedPropertySimplePU('18', this, "fontSize");
         this.__lineHeight = new ObservedPropertySimplePU('', this, "lineHeight");
         this.fontList = 
@@ -149,7 +151,7 @@ class Reader extends ViewPU {
             viewPortHeight: this.windowHeight
         };
         this.screenDensityCallBack = null;
-        this.__isLoading = new ObservedPropertySimplePU(true, this, "isLoading");
+        this.__isLoading = new ObservedPropertySimplePU(false, this, "isLoading");
         this.bookFilePath = '';
         this.resourceRequest = (filePath: string): ArrayBuffer => {
             hilog.info(0x0000, TAG, 'resourceRequest : filePath = ' + filePath + ', this.selectFontPath = ' + this.selectFontPath);
@@ -215,6 +217,9 @@ class Reader extends ViewPU {
         }
         if (params.author !== undefined) {
             this.author = params.author;
+        }
+        if (params.loadError !== undefined) {
+            this.loadError = params.loadError;
         }
         if (params.fontSize !== undefined) {
             this.fontSize = params.fontSize;
@@ -290,6 +295,7 @@ class Reader extends ViewPU {
         this.__bookCover.purgeDependencyOnElmtId(rmElmtId);
         this.__bookTitle.purgeDependencyOnElmtId(rmElmtId);
         this.__author.purgeDependencyOnElmtId(rmElmtId);
+        this.__loadError.purgeDependencyOnElmtId(rmElmtId);
         this.__fontSize.purgeDependencyOnElmtId(rmElmtId);
         this.__lineHeight.purgeDependencyOnElmtId(rmElmtId);
         this.__selectFontPath.purgeDependencyOnElmtId(rmElmtId);
@@ -312,6 +318,7 @@ class Reader extends ViewPU {
         this.__bookCover.aboutToBeDeleted();
         this.__bookTitle.aboutToBeDeleted();
         this.__author.aboutToBeDeleted();
+        this.__loadError.aboutToBeDeleted();
         this.__fontSize.aboutToBeDeleted();
         this.__lineHeight.aboutToBeDeleted();
         this.__selectFontPath.aboutToBeDeleted();
@@ -411,6 +418,13 @@ class Reader extends ViewPU {
     set author(newValue: string) {
         this.__author.set(newValue);
     }
+    private __loadError: ObservedPropertySimplePU<string>; // 加载错误信息
+    get loadError() {
+        return this.__loadError.get();
+    }
+    set loadError(newValue: string) {
+        this.__loadError.set(newValue);
+    }
     private __fontSize: ObservedPropertySimplePU<string>;
     get fontSize() {
         return this.__fontSize.get();
@@ -466,90 +480,146 @@ class Reader extends ViewPU {
     }
     private bookFilePath: string;
     async aboutToAppear(): Promise<void> {
-        hilog.info(0x0000, TAG, 'aboutToAppear');
+        hilog.info(0x0000, TAG, 'aboutToAppear Start');
         this.registerScreenDensityChange();
         this.registerListener();
         WindowAbility.getInstance().toggleWindowSystemBar([], this.getUIContext().getHostContext());
+        // 等待窗口尺寸初始化完成（最多等待500ms）
+        const maxWaitTime = 500;
+        const startTime = Date.now();
+        while ((this.windowWidth === 0 || this.windowHeight === 0) && (Date.now() - startTime) < maxWaitTime) {
+            await new Promise<void>(resolve => setTimeout(resolve, 50));
+        }
+        hilog.info(0x0000, TAG, `aboutToAppear: windowSize = ${this.windowWidth}x${this.windowHeight}`);
+        // 更新readerSetting的视口尺寸
+        if (this.windowWidth > 0 && this.windowHeight > 0) {
+            this.readerSetting.viewPortWidth = this.windowWidth;
+            this.readerSetting.viewPortHeight = this.windowHeight;
+        }
         //加载保存的设置
+        hilog.info(0x0000, TAG, 'aboutToAppear: loading settings...');
         const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
         const saved = await SettingStorage.loadSettings(context);
-        if (saved) {
-            // 更新阅读器配置
-            this.readerSetting.fontPath = saved.fontPath;
-            this.readerSetting.fontSize = saved.fontSize;
-            this.readerSetting.lineHeight = saved.lineHeight;
-            this.readerSetting.nightMode = saved.nightMode;
-            this.readerSetting.themeColor = saved.themeColor;
-            this.readerSetting.themeBgImg = saved.themeBgImg;
-            this.readerSetting.flipMode = saved.flipMode;
-            this.themeSelectIndex = saved.themeSelectIndex;
-            // 更新 UI 状态变量
-            this.selectFontPath = saved.fontPath;
-            this.fontSize = saved.fontSize.toString();
-            this.lineHeight = saved.lineHeight.toString();
-            // 优先使用保存的字体颜色和夜间模式设置
-            // 如果保存的设置中有有效的 fontColor（非空字符串），直接使用
-            // themeList: ['white', 'yellow', 'pink', 'green', 'dark', 'whiteSky', 'darkSky']
-            // index 4 (dark), 6 (darkSky) 需要白色字体
-            if (saved.fontColor && saved.fontColor.length > 0) {
-                this.readerSetting.fontColor = saved.fontColor;
-                this.readerSetting.nightMode = saved.nightMode;
-                hilog.info(0x0000, TAG, `Using saved fontColor: ${saved.fontColor}, nightMode: ${saved.nightMode}`);
-            }
-            else {
-                // 兼容旧数据：根据主题索引推断字体颜色
-                hilog.info(0x0000, TAG, `No valid fontColor saved, inferring from themeSelectIndex: ${saved.themeSelectIndex}`);
-                if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6) {
-                    // 深色主题（dark 或 darkSky）：使用白色字体
-                    this.readerSetting.fontColor = '#ffffff';
-                    this.readerSetting.nightMode = true;
+        hilog.info(0x0000, TAG, `aboutToAppear: settings loaded, saved=${saved !== null}`);
+        //************************************************
+        // 检查 UIContext
+        const uiContext = this.getUIContext();
+        if (!uiContext) {
+            hilog.error(0x0000, TAG, 'aboutToAppear: getUIContext is null');
+            this.loadError = 'UI上下文异常';
+            return;
+        }
+        const router = uiContext.getRouter();
+        if (!router) {
+            hilog.error(0x0000, TAG, 'aboutToAppear: router is null');
+            this.loadError = '路由异常';
+            return;
+        }
+        //************************************************
+        try {
+            if (saved) {
+                // 更新阅读器配置
+                this.readerSetting.fontPath = saved.fontPath ?? '';
+                this.readerSetting.fontSize = saved.fontSize ?? 18;
+                this.readerSetting.lineHeight = saved.lineHeight ?? 1.9;
+                this.readerSetting.nightMode = saved.nightMode ?? false;
+                this.readerSetting.themeColor = saved.themeColor ?? 'rgba(248, 249, 250, 1)';
+                this.readerSetting.themeBgImg = saved.themeBgImg ?? '';
+                this.readerSetting.flipMode = saved.flipMode ?? '0';
+                this.themeSelectIndex = saved.themeSelectIndex ?? 0;
+                // 更新 UI 状态变量
+                this.selectFontPath = saved.fontPath ?? '';
+                this.fontSize = (saved.fontSize ?? 18).toString();
+                this.lineHeight = (saved.lineHeight ?? 1.9).toString();
+                // 优先使用保存的字体颜色和夜间模式设置
+                // 如果保存的设置中有有效的 fontColor（非空字符串），直接使用
+                // themeList: ['white', 'yellow', 'pink', 'green', 'dark', 'whiteSky', 'darkSky']
+                // index 4 (dark), 6 (darkSky) 需要白色字体
+                if (saved.fontColor && saved.fontColor.length > 0) {
+                    this.readerSetting.fontColor = saved.fontColor;
+                    this.readerSetting.nightMode = saved.nightMode;
+                    hilog.info(0x0000, TAG, `Using saved fontColor: ${saved.fontColor}, nightMode: ${saved.nightMode}`);
                 }
                 else {
-                    // 浅色主题：根据系统颜色模式决定
-                    if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
+                    // 兼容旧数据：根据主题索引推断字体颜色
+                    hilog.info(0x0000, TAG, `No valid fontColor saved, inferring from themeSelectIndex: ${saved.themeSelectIndex}`);
+                    if (saved.themeSelectIndex === 4 || saved.themeSelectIndex === 6) {
+                        // 深色主题（dark 或 darkSky）：使用白色字体
                         this.readerSetting.fontColor = '#ffffff';
                         this.readerSetting.nightMode = true;
                     }
                     else {
-                        this.readerSetting.fontColor = '#000000';
-                        this.readerSetting.nightMode = false;
+                        // 浅色主题：根据系统颜色模式决定
+                        if (this.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK) {
+                            this.readerSetting.fontColor = '#ffffff';
+                            this.readerSetting.nightMode = true;
+                        }
+                        else {
+                            this.readerSetting.fontColor = '#000000';
+                            this.readerSetting.nightMode = false;
+                        }
                     }
+                    hilog.info(0x0000, TAG, `Inferred fontColor: ${this.readerSetting.fontColor}, nightMode: ${this.readerSetting.nightMode}`);
                 }
-                hilog.info(0x0000, TAG, `Inferred fontColor: ${this.readerSetting.fontColor}, nightMode: ${this.readerSetting.nightMode}`);
+                // 加载TTS朗读设置
+                if (saved.ttsVolume !== undefined) {
+                    this.ttsVolume = saved.ttsVolume;
+                    this.speaker.setVolume(this.ttsVolume);
+                }
+                else {
+                    this.ttsVolume = 1.0;
+                }
+                if (saved.ttsPitch !== undefined) {
+                    this.ttsPitch = saved.ttsPitch;
+                    this.speaker.setPitch(this.ttsPitch);
+                }
+                else {
+                    this.ttsPitch = 1.0;
+                }
+                if (saved.ttsSpeed !== undefined) {
+                    this.ttsSpeed = saved.ttsSpeed;
+                    this.speaker.setSpeed(this.ttsSpeed);
+                }
+                else {
+                    this.ttsSpeed = 1.0;
+                }
+                // 如果保存的字体路径在字体列表中，可能需要高亮（字体选择按钮已经通过 selectFontPath 处理）
             }
-            // 加载TTS朗读设置
-            if (saved.ttsVolume !== undefined) {
-                this.ttsVolume = saved.ttsVolume;
-                this.speaker.setVolume(this.ttsVolume);
+            //获取路由参数启动阅读器！
+            hilog.info(0x0000, TAG, `========== aboutToAppear: Getting Router Params ==========`);
+            hilog.info(0x0000, TAG, 'aboutToAppear: before getRouterParams');
+            let param = this.getUIContext().getRouter().getParams() as paramType;
+            hilog.info(0x0000, TAG, `aboutToAppear: param exists = ${param !== null && param !== undefined}`);
+            let filePath = param?.filePath ?? '';
+            let resourceIndex = param?.resourceIndex ?? 0;
+            let domPos = param?.domPos ?? '';
+            hilog.info(0x0000, TAG, `aboutToAppear: filePath=${filePath}`);
+            hilog.info(0x0000, TAG, `aboutToAppear: filePath length=${filePath?.length}`);
+            hilog.info(0x0000, TAG, `aboutToAppear: resourceIndex=${resourceIndex}, domPos=${domPos}`);
+            // 优先使用从参数传递的书籍信息（解决TXT文件bookIdentity都是"_"的问题）
+            if (param.bookName) {
+                this.bookTitle = param.bookName;
+                hilog.info(0x0000, TAG, `aboutToAppear: using bookName from params: ${param.bookName}`);
             }
-            if (saved.ttsPitch !== undefined) {
-                this.ttsPitch = saved.ttsPitch;
-                this.speaker.setPitch(this.ttsPitch);
+            if (param.bookAuthor) {
+                this.author = param.bookAuthor;
+                hilog.info(0x0000, TAG, `aboutToAppear: using bookAuthor from params: ${param.bookAuthor}`);
             }
-            if (saved.ttsSpeed !== undefined) {
-                this.ttsSpeed = saved.ttsSpeed;
-                this.speaker.setSpeed(this.ttsSpeed);
+            this.bookFilePath = param.filePath; // 先保存文件路径，startPlay 中会用到
+            hilog.info(0x0000, TAG, `aboutToAppear: bookFilePath set to ${this.bookFilePath}`);
+            try {
+                await this.startPlay(filePath, resourceIndex, domPos);
+                hilog.info(0x0000, TAG, 'aboutToAppear: startPlay completed successfully');
             }
-            // 如果保存的字体路径在字体列表中，可能需要高亮（字体选择按钮已经通过 selectFontPath 处理）
+            catch (err) {
+                hilog.error(0x0000, TAG, `aboutToAppear startPlay failed：${err}`);
+                this.loadError = '打开书籍失败';
+            }
         }
-        //获取路由参数启动阅读器！
-        let param = this.getUIContext().getRouter().getParams() as paramType;
-        let filePath = param.filePath;
-        let resourceIndex = param.resourceIndex;
-        let domPos = param.domPos;
-        // 优先使用从参数传递的书籍信息（解决TXT文件bookIdentity都是"_"的问题）
-        if (param.bookName) {
-            this.bookTitle = param.bookName;
-            hilog.info(0x0000, TAG, `aboutToAppear: using bookName from params: ${param.bookName}`);
+        catch (error) {
+            hilog.error(0x0000, TAG, `aboutToAppear: error - ${error}`);
+            this.loadError = `加载失败: ${error.message || '未知错误'}`;
         }
-        if (param.bookAuthor) {
-            this.author = param.bookAuthor;
-            hilog.info(0x0000, TAG, `aboutToAppear: using bookAuthor from params: ${param.bookAuthor}`);
-        }
-        this.startPlay(filePath, resourceIndex, domPos).catch(() => {
-            hilog.error(0x0000, TAG, `aboutToAppear startPlay failed`);
-        });
-        this.bookFilePath = param.filePath; // 保存文件路径
         //预加载
         emitter.on("eventId", () => {
             this.isClicked = false;
@@ -702,39 +772,104 @@ class Reader extends ViewPU {
     }
     //以指定阅读进度打开书籍，初始化阅读器页面。阅读器启动的统一入口
     private async startPlay(path: string, resourceIndex: number, domPos: string) {
+        hilog.info(0x0000, TAG, `========== startPlay BEGIN ==========`);
+        hilog.info(0x0000, TAG, `startPlay: path=${path}`);
+        hilog.info(0x0000, TAG, `startPlay: path length=${path?.length}, path type=${typeof path}`);
+        hilog.info(0x0000, TAG, `startPlay: resourceIndex=${resourceIndex}, domPos=${domPos}`);
         try {
+            // 验证文件路径
+            if (!path || path.length === 0) {
+                hilog.error(0x0000, TAG, 'startPlay: filePath is empty');
+                this.loadError = '文件路径无效';
+                return;
+            }
+            // 验证文件是否存在
+            try {
+                const stat = fs.statSync(path);
+                hilog.info(0x0000, TAG, `startPlay: file exists, size=${stat.size}`);
+            }
+            catch (e) {
+                hilog.error(0x0000, TAG, `startPlay: file not found: ${path}`);
+                hilog.error(0x0000, TAG, `startPlay: stat error: ${JSON.stringify(e)}`);
+                this.loadError = '书籍文件不存在或已被删除';
+                return;
+            }
             let context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+            hilog.info(0x0000, TAG, `startPlay: context obtained, path=${path}`);
             //调用阅读器控制器的初始化方法，传入上下文，准备阅读环境。
-            let initPromise: Promise<void> = this.readerComponentController.init(context).catch(() => {
-                // TODO: Implement error handling.
+            let initPromise: Promise<void> = this.readerComponentController.init(context).catch((err: BusinessError) => {
+                hilog.error(0x0000, TAG, `startPlay: readerComponentController.init failed: ${err?.message}`);
             });
             //通过书籍解析器工厂（bookParser.getDefaultHandler）根据文件路径获取对应的解析器处理器（例如针对TXT、EPUB等不同格式的解析器）
-            let defaultHandler: Promise<bookParser.BookParserHandler> = bookParser.getDefaultHandler(path);
+            let defaultHandler: Promise<bookParser.BookParserHandler | null> = bookParser.getDefaultHandler(path)
+                .then((handler) => {
+                hilog.info(0x0000, TAG, `startPlay: getDefaultHandler success, handler=${handler !== null}`);
+                return handler;
+            })
+                .catch((err: BusinessError) => {
+                hilog.error(0x0000, TAG, `startPlay: getDefaultHandler failed, Code: ${err?.code}, message: ${err?.message}`);
+                return null;
+            });
             //Promise.all同时执行两个异步任务，提高效率.result[0]为解析器处理器，result[1]为init完成信号（void）。
             let result: [
-                bookParser.BookParserHandler,
+                bookParser.BookParserHandler | null,
                 void
             ] = await Promise.all([defaultHandler, initPromise]);
             //将获取到的解析器处理器保存到实例变量，供后续使用
             this.defaultHandler = result[0];
+            // 验证解析器是否成功获取
+            if (!this.defaultHandler) {
+                hilog.error(0x0000, TAG, 'startPlay: defaultHandler is null, cannot continue');
+                this.loadError = '无法解析书籍文件，请检查文件格式是否正确';
+                return;
+            }
             //将解析器注册到阅读器控制器，这样控制器就能通过解析器获取书籍章节内容。
             this.readerComponentController.registerBookParser(this.defaultHandler);
+            hilog.info(0x0000, TAG, 'startPlay: registerBookParser completed');
+            // 确保视口尺寸正确后再设置页面配置
+            if (this.windowWidth > 0 && this.windowHeight > 0) {
+                this.readerSetting.viewPortWidth = this.windowWidth;
+                this.readerSetting.viewPortHeight = this.windowHeight;
+            }
+            hilog.info(0x0000, TAG, `startPlay: readerSetting viewPort=${this.readerSetting.viewPortWidth}x${this.readerSetting.viewPortHeight}`);
             this.readerComponentController.setPageConfig(this.readerSetting);
+            // 获取书籍信息（标题、作者、封面）- 必须在startPlay之前调用
+            await this.getBookInfo();
+            // 预加载目录列表（避免点击目录时才加载导致延迟）
+            try {
+                this.catalogItemList = this.defaultHandler?.getCatalogList() || [];
+                hilog.info(0x0000, TAG, `startPlay: catalogItemList loaded, length=${this.catalogItemList.length}`);
+            }
+            catch (e) {
+                hilog.error(0x0000, TAG, `startPlay: getCatalogList failed: ${e}`);
+            }
             //启动阅读，跳转到指定章节并定位到domPos指定的文档位置。
-            this.readerComponentController.startPlay(resourceIndex || 0, domPos).catch(() => { });
+            try {
+                await this.readerComponentController.startPlay(resourceIndex || 0, domPos);
+                hilog.info(0x0000, TAG, 'startPlay: readerComponentController.startPlay completed');
+            }
+            catch (err) {
+                hilog.error(0x0000, TAG, `startPlay: readerComponentController.startPlay failed: ${err}`);
+            }
             // 立即加载当前页文本（因为 startPlay 可能不会触发 pageShow 立即更新）
             await this.loadCurrentPageText(resourceIndex || 0);
+            // 加载成功，清除错误状态
+            this.loadError = '';
         }
         catch (error) {
             hilog.error(0x0000, TAG, `startPlay failed, Code: ${error.code}, message: ${error.message}`);
+            this.loadError = `加载失败: ${error.message || '未知错误'}`;
         }
     }
     //获取书籍信息//从书籍解析器处理器中获取并解析书籍的元信息（书名、作者）和封面图片
     private async getBookInfo() {
         try {
+            hilog.info(0x0000, TAG, `getBookInfo: defaultHandler exists = ${this.defaultHandler !== null}`);
             //通过 defaultHandler（书籍解析器）调用 getBookInfo() 获得一个包含书名、作者、封面资源标识等信息的 BookInfo 对象
             let bookInfo: bookParser.BookInfo | undefined = this.defaultHandler?.getBookInfo();
+            hilog.info(0x0000, TAG, `getBookInfo: bookInfo exists = ${bookInfo !== undefined}`);
             if (bookInfo) {
+                hilog.info(0x0000, TAG, `getBookInfo: bookInfo.bookTitle=${bookInfo.bookTitle}, bookInfo.bookCreator=${bookInfo.bookCreator}`);
                 // 只有当bookTitle和author为空时，才从bookInfo中获取（避免覆盖从参数传递的值）
                 if (!this.bookTitle && bookInfo.bookTitle) {
                     this.bookTitle = bookInfo.bookTitle;
@@ -742,14 +877,21 @@ class Reader extends ViewPU {
                 if (!this.author && bookInfo?.bookCreator) {
                     this.author = bookInfo.bookCreator;
                 }
-                //获取并解码封面图片
-                //调用解析器的 getResourceContent 方法，传入-1封面资源的标识（如路径），获得封面图片的二进制数据
-                let buffer = this.defaultHandler?.getResourceContent(-1, bookInfo.bookCoverImage);
-                //将二进制数据转换为 ImageSource 对象
-                let imageSource: image.ImageSource = image.createImageSource(buffer);
-                //从 ImageSource 创建可用于 UI 显示的 PixelMap（像素图），并保存到组件变量 this.bookCover 中。
-                this.bookCover = await imageSource.createPixelMap();
-                imageSource.release();
+                //获取并解码封面图片（封面加载失败不影响其他功能）
+                try {
+                    //调用解析器的 getResourceContent 方法，传入-1封面资源的标识（如路径），获得封面图片的二进制数据
+                    let buffer = this.defaultHandler?.getResourceContent(-1, bookInfo.bookCoverImage);
+                    if (buffer && buffer.byteLength > 0) {
+                        //将二进制数据转换为 ImageSource 对象
+                        let imageSource: image.ImageSource = image.createImageSource(buffer);
+                        //从 ImageSource 创建可用于 UI 显示的 PixelMap（像素图），并保存到组件变量 this.bookCover 中。
+                        this.bookCover = await imageSource.createPixelMap();
+                        imageSource.release();
+                    }
+                }
+                catch (coverError) {
+                    hilog.warn(0x0000, TAG, `getBookInfo: cover load failed, but continue: ${coverError.message}`);
+                }
             }
             hilog.info(0x0000, TAG, `getBookInfo: bookTitle=${this.bookTitle}, author=${this.author}`);
         }
@@ -1714,177 +1856,255 @@ class Reader extends ViewPU {
             });
         }, Stack);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
-            __Common__.create();
-            __Common__.zIndex(1);
-        }, __Common__);
-        {
-            this.observeComponentCreation2((elmtId, isInitialRender) => {
-                if (isInitialRender) {
-                    let componentCall = new 
-                    //阅读内容展示,交互场景化组件
-                    ReadPageComponent(this, {
-                        controller: this.readerComponentController,
-                        readerCallback: (err: BusinessError, data: readerCore.ReaderComponentController) => {
-                            this.readerComponentController = data; //使得父组件可以持有并后续使用这个控制器来操作阅读器
-                            if (err) {
-                                hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
-                            }
-                        }
-                    }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1251, col: 7 });
-                    ViewPU.create(componentCall);
-                    let paramsLambda = () => {
-                        return {
-                            controller: this.readerComponentController,
-                            readerCallback: (err: BusinessError, data: readerCore.ReaderComponentController) => {
-                                this.readerComponentController = data; //使得父组件可以持有并后续使用这个控制器来操作阅读器
-                                if (err) {
-                                    hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
-                                }
-                            }
-                        };
-                    };
-                    componentCall.paramsGenerator_ = paramsLambda;
-                }
-                else {
-                    this.updateStateVarsOfChildByElmtId(elmtId, {});
-                }
-            }, { name: "ReadPageComponent" });
-        }
-        __Common__.pop();
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
-            //播放图标
-            Row.create();
-            Context.animation({ duration: 300, curve: Curve.EaseInOut });
-            //播放图标
-            Row.position({ top: 30, right: 20 });
-            //播放图标
-            Row.zIndex(4);
-            //播放图标
-            Row.visibility(this.currentIndex >= 0 ? Visibility.Visible : Visibility.None);
-            Context.animation(null);
-        }, Row);
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Image.create(this.isClicked ? { "id": 16777275, "type": 20000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777274, "type": 20000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Image.width(40);
-            Image.height(40);
-            Image.onClick(async () => {
-                hilog.info(0x0000, TAG, 'currentPageText: ' + this.currentPageText);
-                if (!this.currentPageText) {
-                    hilog.warn(0x0000, TAG, 'No text to speak');
-                    this.getUIContext().getPromptAction().showToast({ message: '当前页面无文本', duration: 1000 });
-                    return;
-                }
-                const newState = !this.isClicked;
-                this.isClicked = newState; // 先切换状态，让按钮图标变化
-                if (newState) {
-                    try {
-                        await this.speaker.startSpeak(this.currentPageText);
-                    }
-                    catch (error) {
-                        hilog.error(0x0000, TAG, `startSpeak error: ${error}`);
-                        this.isClicked = false; // 朗读失败时恢复状态
-                        this.getUIContext().getPromptAction().showToast({ message: '朗读失败', duration: 1000 });
-                    }
-                }
-                else {
-                    this.speaker.stopSpeak();
-                }
-            });
-        }, Image);
-        //播放图标
-        Row.pop();
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
             If.create();
-            //menu bar
-            if (this.currentIndex >= 0) {
+            // 加载错误提示（放在最外层，覆盖所有内容）
+            if (this.loadError) {
                 this.ifElseBranchUpdateFunction(0, () => {
                     this.observeComponentCreation2((elmtId, isInitialRender) => {
-                        //外层遮罩：全屏，半透明背景，点击关闭
                         Column.create();
-                        //外层遮罩：全屏，半透明背景，点击关闭
                         Column.width('100%');
-                        //外层遮罩：全屏，半透明背景，点击关闭
                         Column.height('100%');
-                        //外层遮罩：全屏，半透明背景，点击关闭
-                        Column.backgroundColor(this.currentIndex === 0 ? '#0d626262' : Color.Transparent);
-                        //外层遮罩：全屏，半透明背景，点击关闭
-                        Column.justifyContent(FlexAlign.End);
-                        //外层遮罩：全屏，半透明背景，点击关闭
-                        Column.onClick(() => this.closeModal());
-                        //外层遮罩：全屏，半透明背景，点击关闭
-                        Column.transition(TransitionEffect.translate({ y: '100%' }).animation({ duration: 300, curve: Curve.EaseInOut }));
-                        //外层遮罩：全屏，半透明背景，点击关闭
-                        Column.zIndex(2);
+                        Column.justifyContent(FlexAlign.Center);
+                        Column.backgroundColor(Color.White);
+                        Column.zIndex(10);
                     }, Column);
                     this.observeComponentCreation2((elmtId, isInitialRender) => {
-                        //内部菜单容器：实际内容：目录/设置 + 底部按钮
-                        Column.create();
-                        //内部菜单容器：实际内容：目录/设置 + 底部按钮
-                        Column.width('100%');
-                        //内部菜单容器：实际内容：目录/设置 + 底部按钮
-                        Column.height('80%');
-                    }, Column);
+                        Text.create('无法打开书籍');
+                        Text.fontSize(20);
+                        Text.fontColor('#FF0000');
+                        Text.margin({ bottom: 16 });
+                    }, Text);
+                    Text.pop();
                     this.observeComponentCreation2((elmtId, isInitialRender) => {
-                        //内容区域：目录和设置
-                        Column.create();
-                        //内容区域：目录和设置
-                        Column.layoutWeight(1);
-                        //内容区域：目录和设置
-                        Column.width('100%');
-                        //内容区域：目录和设置
-                        Column.backgroundColor(this.eyeMode ? '#FAF9DE' : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-                        //内容区域：目录和设置
-                        Column.borderRadius({ topRight: 32, topLeft: 32 });
-                    }, Column);
+                        Text.create(this.loadError);
+                        Text.fontSize(16);
+                        Text.fontColor('#666666');
+                        Text.margin({ bottom: 24 });
+                    }, Text);
+                    Text.pop();
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        Button.createWithLabel('返回书架');
+                        Button.onClick(() => {
+                            this.getUIContext().getRouter().back();
+                        });
+                    }, Button);
+                    Button.pop();
+                    Column.pop();
+                });
+            }
+            else {
+                this.ifElseBranchUpdateFunction(1, () => {
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        __Common__.create();
+                        __Common__.zIndex(1);
+                    }, __Common__);
+                    {
+                        this.observeComponentCreation2((elmtId, isInitialRender) => {
+                            if (isInitialRender) {
+                                let componentCall = new 
+                                //阅读内容展示,交互场景化组件
+                                ReadPageComponent(this, {
+                                    controller: this.readerComponentController,
+                                    readerCallback: (err: BusinessError, data: readerCore.ReaderComponentController) => {
+                                        this.readerComponentController = data; //使得父组件可以持有并后续使用这个控制器来操作阅读器
+                                        if (err) {
+                                            hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
+                                        }
+                                    }
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1422, col: 7 });
+                                ViewPU.create(componentCall);
+                                let paramsLambda = () => {
+                                    return {
+                                        controller: this.readerComponentController,
+                                        readerCallback: (err: BusinessError, data: readerCore.ReaderComponentController) => {
+                                            this.readerComponentController = data; //使得父组件可以持有并后续使用这个控制器来操作阅读器
+                                            if (err) {
+                                                hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
+                                            }
+                                        }
+                                    };
+                                };
+                                componentCall.paramsGenerator_ = paramsLambda;
+                            }
+                            else {
+                                this.updateStateVarsOfChildByElmtId(elmtId, {});
+                            }
+                        }, { name: "ReadPageComponent" });
+                    }
+                    __Common__.pop();
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        //播放图标
+                        Row.create();
+                        Context.animation({ duration: 300, curve: Curve.EaseInOut });
+                        //播放图标
+                        Row.position({ top: 30, right: 20 });
+                        //播放图标
+                        Row.zIndex(4);
+                        //播放图标
+                        Row.visibility(this.currentIndex >= 0 ? Visibility.Visible : Visibility.None);
+                        Context.animation(null);
+                    }, Row);
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        Image.create(this.isClicked ? { "id": 16777275, "type": 20000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777274, "type": 20000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                        Image.width(40);
+                        Image.height(40);
+                        Image.onClick(async () => {
+                            hilog.info(0x0000, TAG, 'currentPageText: ' + this.currentPageText);
+                            if (!this.currentPageText) {
+                                hilog.warn(0x0000, TAG, 'No text to speak');
+                                this.getUIContext().getPromptAction().showToast({ message: '当前页面无文本', duration: 1000 });
+                                return;
+                            }
+                            const newState = !this.isClicked;
+                            this.isClicked = newState; // 先切换状态，让按钮图标变化
+                            if (newState) {
+                                try {
+                                    await this.speaker.startSpeak(this.currentPageText);
+                                }
+                                catch (error) {
+                                    hilog.error(0x0000, TAG, `startSpeak error: ${error}`);
+                                    this.isClicked = false; // 朗读失败时恢复状态
+                                    this.getUIContext().getPromptAction().showToast({ message: '朗读失败', duration: 1000 });
+                                }
+                            }
+                            else {
+                                this.speaker.stopSpeak();
+                            }
+                        });
+                    }, Image);
+                    //播放图标
+                    Row.pop();
                     this.observeComponentCreation2((elmtId, isInitialRender) => {
                         If.create();
-                        if (this.currentIndex === 0) {
+                        //menu bar
+                        if (this.currentIndex >= 0) {
                             this.ifElseBranchUpdateFunction(0, () => {
-                                this.buildCatalogItemList.bind(this)();
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.create();
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.width('100%');
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.height('100%');
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.backgroundColor(this.currentIndex === 0 ? '#0d626262' : Color.Transparent);
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.justifyContent(FlexAlign.End);
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.onClick(() => this.closeModal());
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.transition(TransitionEffect.translate({ y: '100%' }).animation({ duration: 300, curve: Curve.EaseInOut }));
+                                    //外层遮罩：全屏，半透明背景，点击关闭
+                                    Column.zIndex(2);
+                                }, Column);
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    //内部菜单容器：实际内容：目录/设置 + 底部按钮
+                                    Column.create();
+                                    //内部菜单容器：实际内容：目录/设置 + 底部按钮
+                                    Column.width('100%');
+                                    //内部菜单容器：实际内容：目录/设置 + 底部按钮
+                                    Column.height('80%');
+                                }, Column);
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    //内容区域：目录和设置
+                                    Column.create();
+                                    //内容区域：目录和设置
+                                    Column.layoutWeight(1);
+                                    //内容区域：目录和设置
+                                    Column.width('100%');
+                                    //内容区域：目录和设置
+                                    Column.backgroundColor(this.eyeMode ? '#FAF9DE' : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                                    //内容区域：目录和设置
+                                    Column.borderRadius({ topRight: 32, topLeft: 32 });
+                                }, Column);
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    If.create();
+                                    if (this.currentIndex === 0) {
+                                        this.ifElseBranchUpdateFunction(0, () => {
+                                            this.buildCatalogItemList.bind(this)();
+                                        });
+                                    }
+                                    else {
+                                        this.ifElseBranchUpdateFunction(1, () => {
+                                            this.buildSetting.bind(this)();
+                                        });
+                                    }
+                                }, If);
+                                If.pop();
+                                //内容区域：目录和设置
+                                Column.pop();
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    // 底部按钮栏
+                                    Row.create();
+                                    // 底部按钮栏
+                                    Row.width('100%');
+                                    // 底部按钮栏
+                                    Row.height(80);
+                                    // 底部按钮栏
+                                    Row.backgroundColor(Color.White);
+                                }, Row);
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    Text.create({ "id": 16777226, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                                    Text.width('50%');
+                                    Text.height('100%');
+                                    Text.onClick(() => this.jumpToCatalogList());
+                                    Text.textAlign(TextAlign.Center);
+                                    Text.fontColor(this.currentIndex === 0 ? Color.Red : Color.Black);
+                                }, Text);
+                                Text.pop();
+                                this.observeComponentCreation2((elmtId, isInitialRender) => {
+                                    Text.create({ "id": 16777238, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                                    Text.width('50%');
+                                    Text.height('100%');
+                                    Text.onClick(() => this.jumpToSetting());
+                                    Text.textAlign(TextAlign.Center);
+                                    Text.fontColor(this.currentIndex === 1 ? Color.Red : Color.Black);
+                                }, Text);
+                                Text.pop();
+                                // 底部按钮栏
+                                Row.pop();
+                                //内部菜单容器：实际内容：目录/设置 + 底部按钮
+                                Column.pop();
+                                //外层遮罩：全屏，半透明背景，点击关闭
+                                Column.pop();
                             });
                         }
                         else {
                             this.ifElseBranchUpdateFunction(1, () => {
-                                this.buildSetting.bind(this)();
                             });
                         }
                     }, If);
                     If.pop();
-                    //内容区域：目录和设置
-                    Column.pop();
+                });
+            }
+        }, If);
+        If.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            If.create();
+            // 加载指示器（仅在加载时显示）
+            if (this.isLoading) {
+                this.ifElseBranchUpdateFunction(0, () => {
                     this.observeComponentCreation2((elmtId, isInitialRender) => {
-                        // 底部按钮栏
-                        Row.create();
-                        // 底部按钮栏
-                        Row.width('100%');
-                        // 底部按钮栏
-                        Row.height(80);
-                        // 底部按钮栏
-                        Row.backgroundColor(Color.White);
-                    }, Row);
+                        Column.create();
+                        Column.width('100%');
+                        Column.height('100%');
+                        Column.justifyContent(FlexAlign.Center);
+                        Column.backgroundColor(Color.White);
+                        Column.zIndex(5);
+                    }, Column);
                     this.observeComponentCreation2((elmtId, isInitialRender) => {
-                        Text.create({ "id": 16777226, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-                        Text.width('50%');
-                        Text.height('100%');
-                        Text.onClick(() => this.jumpToCatalogList());
-                        Text.textAlign(TextAlign.Center);
-                        Text.fontColor(this.currentIndex === 0 ? Color.Red : Color.Black);
+                        LoadingProgress.create();
+                        LoadingProgress.width(50);
+                        LoadingProgress.height(50);
+                        LoadingProgress.color({ "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                    }, LoadingProgress);
+                    this.observeComponentCreation2((elmtId, isInitialRender) => {
+                        Text.create('正在加载书籍...');
+                        Text.fontSize(16);
+                        Text.fontColor('#666666');
+                        Text.margin({ top: 16 });
                     }, Text);
                     Text.pop();
-                    this.observeComponentCreation2((elmtId, isInitialRender) => {
-                        Text.create({ "id": 16777238, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-                        Text.width('50%');
-                        Text.height('100%');
-                        Text.onClick(() => this.jumpToSetting());
-                        Text.textAlign(TextAlign.Center);
-                        Text.fontColor(this.currentIndex === 1 ? Color.Red : Color.Black);
-                    }, Text);
-                    Text.pop();
-                    // 底部按钮栏
-                    Row.pop();
-                    //内部菜单容器：实际内容：目录/设置 + 底部按钮
-                    Column.pop();
-                    //外层遮罩：全屏，半透明背景，点击关闭
                     Column.pop();
                 });
             }
@@ -1894,20 +2114,6 @@ class Reader extends ViewPU {
             }
         }, If);
         If.pop();
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Row.create();
-            Row.width('100%');
-            Row.height('100%');
-            Row.justifyContent(FlexAlign.Center);
-            Row.backgroundColor(Color.White);
-            Row.zIndex(3);
-            Row.visibility(this.isLoading ? Visibility.Visible : Visibility.None);
-        }, Row);
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create('加载中哦...');
-        }, Text);
-        Text.pop();
-        Row.pop();
         Stack.pop();
     }
     //开启目录栏
