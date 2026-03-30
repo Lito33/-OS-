@@ -864,7 +864,8 @@
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\Login.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\About.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\ReadingRecord.ets",
-        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\DebugStorage.ets"
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\DebugStorage.ets",
+        "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncSettings.ets"
       ],
       "error": false
     },
@@ -1857,7 +1858,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\common\\SettingStorage.ets": {
-      "mtimeMs": 1774851354346.5342,
+      "mtimeMs": 1774854642861.5227,
       "children": [
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.data.preferences.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.app.ability.common.d.ts"
@@ -2404,7 +2405,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\Reader.ets": {
-      "mtimeMs": 1774851560810.133,
+      "mtimeMs": 1774856997345.5625,
       "children": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\entryability\\WindowAbility.ets",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.display.d.ts",
@@ -2459,7 +2460,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\About.ets": {
-      "mtimeMs": 1774587108004.2927,
+      "mtimeMs": 1774857261401.9473,
       "children": [
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.promptAction.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.router.d.ts",
@@ -2503,7 +2504,7 @@
       ]
     },
     "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\pages\\SyncSettings.ets": {
-      "mtimeMs": 1774584640596.293,
+      "mtimeMs": 1774858226896.0188,
       "children": [
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\DistributedSyncManager.ets",
         "D:\\devecoStudioDriector\\SomeDemo\\LocalReading\\entry\\src\\main\\ets\\utils\\SyncManager.ets",
@@ -2514,6 +2515,7 @@
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.abilityAccessCtrl.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.hilog.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.promptAction.d.ts",
+        "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.router.d.ts",
         "D:\\what down\\vediodown\\tool\\devecostudio\\DevEco Studio\\sdk\\default\\openharmony\\ets\\api\\@ohos.data.preferences.d.ts"
       ],
       "parent": [],

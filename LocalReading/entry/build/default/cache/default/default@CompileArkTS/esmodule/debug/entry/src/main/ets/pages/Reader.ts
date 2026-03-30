@@ -73,7 +73,7 @@ interface AttemptParams {
     index: number;
     path: string;
 }
-// 章节项（用于目录显示）
+// 章节项
 interface ChapterItem {
     index: number; // spine索引
     name: string; // 章节名称
@@ -1613,7 +1613,7 @@ class Reader extends ViewPU {
             Row.margin({ left: 16, top: 16, right: 16 });
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create('单手模式');
+            Text.create({ "id": 16777325, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontColor(Color.Black);
             Text.fontSize(15);
             Text.width(65);
@@ -1631,7 +1631,7 @@ class Reader extends ViewPU {
         }, Toggle);
         Toggle.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create('点击左右侧都翻下一页');
+            Text.create({ "id": 16777326, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
             Text.fontColor('#666666');
             Text.margin({ left: 8 });

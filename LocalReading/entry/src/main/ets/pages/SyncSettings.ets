@@ -4,7 +4,7 @@ import { NetworkManager, NetworkInfo } from '../utils/NetworkManager'
 import { GlobalContext } from '../common/GlobalContext'
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit'
 import { hilog } from '@kit.PerformanceAnalysisKit'
-import { promptAction } from '@kit.ArkUI'
+import { promptAction, router } from '@kit.ArkUI'
 import preferences from '@ohos.data.preferences'
 
 const TAG: string = 'SyncSettings';
@@ -44,16 +44,40 @@ struct SyncSettings {
     this.stopSyncStatusMonitoring()
     this.stopAutoSync()
   }
+  @StorageLink('windowWidth') windowWidth: number = 360
+
+
+
   
   build() {
     Column() {
-      // 标题
-      Text('数据同步设置')
-        .fontColor(Color.Black)
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 50, bottom: 10 })
-      
+      Row(){
+        Image($r('app.media.arrow_Left'))
+          .width(25)
+          .height(25)
+          .margin({left:20})
+          .onClick(() => {
+            router.back();
+          })
+
+        Blank()
+          .layoutWeight(1)
+
+        // 标题
+        Text('数据同步设置')
+          .fontColor(Color.Black)
+          .fontSize(24)
+          .fontWeight(FontWeight.Bold)
+          .margin({right:24})
+          .padding({right:12})
+
+
+        Blank()
+          .layoutWeight(1)
+      }
+      .width("100%")
+      .margin({top:50, bottom: 10})
+
       Scroll() {
         Column({ space: 20 }) {
           // 同步状态卡片

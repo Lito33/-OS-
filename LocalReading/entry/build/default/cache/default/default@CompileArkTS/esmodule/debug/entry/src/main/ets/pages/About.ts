@@ -278,7 +278,7 @@ class About extends ViewPU {
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create("1.0.0");
+            Text.create("1.1.0");
             Text.fontColor(Color.Black);
             Text.fontSize(this.getTitleFontSize());
             Text.margin({ right: 5 });

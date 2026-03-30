@@ -163,7 +163,7 @@ struct About{
             .fontColor(Color.Black)
             .fontSize(this.getTitleFontSize())
             .margin({left:5})
-          Text("1.0.0")
+          Text("1.1.0")
             .fontColor(Color.Black)
             .fontSize(this.getTitleFontSize())
             .margin({right:5})

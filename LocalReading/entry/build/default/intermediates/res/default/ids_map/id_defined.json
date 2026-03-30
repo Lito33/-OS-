@@ -435,5 +435,13 @@
 			"type":	"string",
 			"name":	"SpeechRate",
 			"id":	"0x0100006C"
+		}, {
+			"type":	"string",
+			"name":	"SingleMode",
+			"id":	"0x0100006D"
+		}, {
+			"type":	"string",
+			"name":	"SingleModeDescription",
+			"id":	"0x0100006E"
 		}]
 }

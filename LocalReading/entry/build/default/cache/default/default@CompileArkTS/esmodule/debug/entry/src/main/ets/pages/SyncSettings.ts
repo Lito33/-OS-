@@ -16,6 +16,7 @@ interface SyncSettings_Params {
     statusMonitorTimer?: number;
     autoSyncTimer?: number;
     AUTO_SYNC_INTERVAL?: number;
+    windowWidth?: number;
 }
 import { DistributedSyncManager } from "@bundle:com.example.readerkitdemo/entry/ets/utils/DistributedSyncManager";
 import type { SyncStatus } from "@bundle:com.example.readerkitdemo/entry/ets/utils/DistributedSyncManager";
@@ -27,6 +28,7 @@ import abilityAccessCtrl from "@ohos:abilityAccessCtrl";
 import type { Permissions } from "@ohos:abilityAccessCtrl";
 import hilog from "@ohos:hilog";
 import promptAction from "@ohos:promptAction";
+import router from "@ohos:router";
 import preferences from "@ohos:data.preferences";
 const TAG: string = 'SyncSettings';
 class SyncSettings extends ViewPU {
@@ -56,6 +58,7 @@ class SyncSettings extends ViewPU {
         ;
         this.AUTO_SYNC_INTERVAL = 5 * 60 * 1000 // 自动同步间隔：5分钟
         ;
+        this.__windowWidth = this.createStorageLink('windowWidth', 360, "windowWidth");
         this.setInitiallyProvidedValue(params);
         this.finalizeConstruction();
     }
@@ -111,6 +114,7 @@ class SyncSettings extends ViewPU {
         this.__syncProgress.purgeDependencyOnElmtId(rmElmtId);
         this.__showImportDialog.purgeDependencyOnElmtId(rmElmtId);
         this.__eyeMode.purgeDependencyOnElmtId(rmElmtId);
+        this.__windowWidth.purgeDependencyOnElmtId(rmElmtId);
     }
     aboutToBeDeleted() {
         this.__syncStatus.aboutToBeDeleted();
@@ -121,6 +125,7 @@ class SyncSettings extends ViewPU {
         this.__syncProgress.aboutToBeDeleted();
         this.__showImportDialog.aboutToBeDeleted();
         this.__eyeMode.aboutToBeDeleted();
+        this.__windowWidth.aboutToBeDeleted();
         SubscriberManager.Get().delete(this.id__());
         this.aboutToBeDeletedInternal();
     }
@@ -196,6 +201,13 @@ class SyncSettings extends ViewPU {
         this.stopSyncStatusMonitoring();
         this.stopAutoSync();
     }
+    private __windowWidth: ObservedPropertyAbstractPU<number>;
+    get windowWidth() {
+        return this.__windowWidth.get();
+    }
+    set windowWidth(newValue: number) {
+        this.__windowWidth.set(newValue);
+    }
     initialRender() {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Column.create();
@@ -203,6 +215,25 @@ class SyncSettings extends ViewPU {
             Column.height('100%');
             Column.backgroundColor(this.eyeMode ? '#FAF9DE' : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
         }, Column);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Row.create();
+            Row.width("100%");
+            Row.margin({ top: 50, bottom: 10 });
+        }, Row);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Image.create({ "id": 16777277, "type": 20000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Image.width(25);
+            Image.height(25);
+            Image.margin({ left: 20 });
+            Image.onClick(() => {
+                router.back();
+            });
+        }, Image);
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Blank.create();
+            Blank.layoutWeight(1);
+        }, Blank);
+        Blank.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             // 标题
             Text.create('数据同步设置');
@@ -213,10 +244,18 @@ class SyncSettings extends ViewPU {
             // 标题
             Text.fontWeight(FontWeight.Bold);
             // 标题
-            Text.margin({ top: 50, bottom: 10 });
+            Text.margin({ right: 24 });
+            // 标题
+            Text.padding({ right: 12 });
         }, Text);
         // 标题
         Text.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Blank.create();
+            Blank.layoutWeight(1);
+        }, Blank);
+        Blank.pop();
+        Row.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Scroll.create();
             Scroll.width('100%');

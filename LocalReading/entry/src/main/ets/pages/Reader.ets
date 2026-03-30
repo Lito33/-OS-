@@ -29,7 +29,7 @@ interface AttemptParams {
   path: string;
 }
 
-// 章节项（用于目录显示）
+// 章节项
 interface ChapterItem {
   index: number;        // spine索引
   name: string;         // 章节名称

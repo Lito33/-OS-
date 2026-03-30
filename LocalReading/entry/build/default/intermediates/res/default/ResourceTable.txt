@@ -6,6 +6,8 @@ string Library 0x01000007
 string LineHeight 0x01000067
 string Notice 0x01000069
 string PageMode 0x0100006a
+string SingleMode 0x0100006d
+string SingleModeDescription 0x0100006e
 string SpeechPitch 0x0100006b
 string SpeechRate 0x0100006c
 string SpeechVolume 0x01000068
