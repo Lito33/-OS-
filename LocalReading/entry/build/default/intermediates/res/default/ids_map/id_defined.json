@@ -443,5 +443,17 @@
 			"type":	"string",
 			"name":	"SingleModeDescription",
 			"id":	"0x0100006E"
+		}, {
+			"type":	"color",
+			"name":	"page_Reader_back",
+			"id":	"0x0100006F"
+		}, {
+			"type":	"color",
+			"name":	"ic_bg_black",
+			"id":	"0x01000070"
+		}, {
+			"type":	"color",
+			"name":	"page_Reader_font",
+			"id":	"0x01000071"
 		}]
 }

@@ -46,6 +46,7 @@ color black_60_opacity 0x0100001c
 color black_90_opacity 0x0100001d
 color blue 0x0100001e
 color color_transparent 0x0100001f
+color ic_bg_black 0x01000070
 color ic_bg_font_selected 0x01000020
 color ic_bg_grey 0x01000021
 color ic_border_select_dark 0x01000022
@@ -61,6 +62,8 @@ color ic_text_input_bg 0x0100002b
 color ic_white_theme_button_background 0x0100002c
 color ic_yellow_theme_button_background 0x0100002d
 color ohos_id_color_primary_light 0x0100002e
+color page_Reader_back 0x0100006f
+color page_Reader_font 0x01000071
 color page_background1 0x0100002f
 color page_background2 0x01000030
 color start_window_background 0x01000031

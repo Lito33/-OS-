@@ -746,7 +746,7 @@ class Reader extends ViewPU {
         display.on('change', this.screenDensityCallBack);
     }
     //资源请求回调。字体文件和主题背景图像可以存储在resources/rawfile目录或应用沙盒路径中。
-    //前面这一坨表示一个接收字符串参数（文件路径）并返回 ArrayBuffer 的回调。
+    //前面这一坨表示一个接收字符串参数（文件路径）并返回 ArrayBuffer 的回调。处理书籍内的图片、字体
     private resourceRequest: bookParser.CallbackRes<string, ArrayBuffer>;
     // 更新章节信息
     private updateChapterInfo(data: readerCore.PageDataInfo): void {
@@ -880,7 +880,7 @@ class Reader extends ViewPU {
         hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}, bookIdentity=${bookIdentity}`);
         await ProgressStorage.saveProgress(context, progress, currentUser);
         hilog.info(0x0000, TAG, 'saveCurrentProgress: progress saved successfully');
-        // ✅ 通知Index页面进度已更新，触发刷新
+        //  通知Index页面进度已更新，触发刷新
         AppStorage.setOrCreate('progressUpdated', Date.now());
         //保存后自动同步-每次翻页后
         await DistributedSyncManager.getInstance().syncProgressOnly();
@@ -1232,7 +1232,7 @@ class Reader extends ViewPU {
             Column.width('100%');
             Column.borderRadius({ topRight: 32, topLeft: 32 });
             Column.visibility(this.currentIndex === 0 ? Visibility.Visible : Visibility.None);
-            Column.backgroundColor(this.eyeMode ? '#FAF9DE' : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Column.backgroundColor(this.eyeMode ? { "id": 16777327, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Column.zIndex(3);
         }, Column);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1258,7 +1258,8 @@ class Reader extends ViewPU {
             //通过 SymbolGlyph 组件可将图标嵌入界面，并支持多色渲染、动态效果等特性
             SymbolGlyph.create({ "id": 125831487, "type": 40000, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             //通过 SymbolGlyph 组件可将图标嵌入界面，并支持多色渲染、动态效果等特性
-            SymbolGlyph.fontColor([{ "id": 16777262, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" }]);
+            SymbolGlyph.fontColor(this.eyeMode ? [{ "id": 16777253, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" }] :
+                [{ "id": 16777262, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" }]);
             //通过 SymbolGlyph 组件可将图标嵌入界面，并支持多色渲染、动态效果等特性
             SymbolGlyph.width(18);
             //通过 SymbolGlyph 组件可将图标嵌入界面，并支持多色渲染、动态效果等特性
@@ -1323,7 +1324,7 @@ class Reader extends ViewPU {
             Text.create(this.bookTitle);
             Text.fontSize({ "id": 125829684, "type": 10002, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.textOverflow({ overflow: TextOverflow.Ellipsis });
-            Text.fontColor({ "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Text.fontColor(this.eyeMode ? Color.White : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.maxLines(1);
             Text.margin({ right: 12, left: 12 });
             Text.fontWeight(FontWeight.Bold);
@@ -1383,13 +1384,15 @@ class Reader extends ViewPU {
                         this.observeComponentCreation2((elmtId, isInitialRender) => {
                             Text.create(' · ');
                             Text.fontSize(14);
-                            Text.fontColor(this.isCurrentChapterByIndex(item.index) ? { "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                            Text.fontColor(this.isCurrentChapterByIndex(item.index) ? { "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } :
+                                (this.eyeMode ? Color.White : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" }));
                         }, Text);
                         Text.pop();
                         this.observeComponentCreation2((elmtId, isInitialRender) => {
                             Text.create(item.name);
                             Text.fontSize(14);
-                            Text.fontColor(this.isCurrentChapterByIndex(item.index) ? { "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+                            Text.fontColor(this.isCurrentChapterByIndex(item.index) ? { "id": 16777246, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } :
+                                (this.eyeMode ? Color.White : { "id": 16777245, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" }));
                             Text.fontWeight(this.isCurrentChapterByIndex(item.index) ? FontWeight.Bold : FontWeight.Normal);
                             Text.textOverflow({ overflow: TextOverflow.Ellipsis });
                             Text.padding({ top: 8, bottom: 8 });
@@ -1423,7 +1426,7 @@ class Reader extends ViewPU {
             Scroll.width('100%');
             Scroll.height('100%');
             Scroll.visibility(this.currentIndex === 1 ? Visibility.Visible : Visibility.None);
-            Scroll.backgroundColor(this.eyeMode ? '#FAF9DE' : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Scroll.backgroundColor(this.eyeMode ? { "id": 16777327, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777263, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Scroll.borderRadius({ topRight: 32, topLeft: 32 });
             Scroll.zIndex(3);
         }, Scroll);
@@ -1518,7 +1521,7 @@ class Reader extends ViewPU {
             Text.width('92%');
             Text.height(1);
             Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Text.backgroundColor(this.eyeMode ? { "id": 16777328, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1531,7 +1534,7 @@ class Reader extends ViewPU {
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777322, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
             Text.fontSize(15);
             Text.width(65);
             Text.margin({ left: 5 });
@@ -1565,7 +1568,7 @@ class Reader extends ViewPU {
             Text.create({ "id": 16777230, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(16);
             Text.lineHeight(21);
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1593,7 +1596,7 @@ class Reader extends ViewPU {
             Text.create({ "id": 16777241, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(16);
             Text.lineHeight(21);
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
         }, Text);
         Text.pop();
         //翻页组件
@@ -1603,7 +1606,7 @@ class Reader extends ViewPU {
             Text.width('92%');
             Text.height(1);
             Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Text.backgroundColor(this.eyeMode ? { "id": 16777328, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1616,10 +1619,11 @@ class Reader extends ViewPU {
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777325, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
             Text.fontSize(15);
+            Text.fontWeight(FontWeight.Bold);
             Text.width(65);
-            Text.margin({ left: 5 });
+            Text.margin({ left: 5, right: 5 });
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1635,7 +1639,7 @@ class Reader extends ViewPU {
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777326, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
-            Text.fontColor('#666666');
+            Text.fontColor(this.eyeMode ? '#ff7c7c7c' : '#666666');
             Text.margin({ left: 8 });
         }, Text);
         Text.pop();
@@ -1646,7 +1650,7 @@ class Reader extends ViewPU {
             Text.width('92%');
             Text.height(1);
             Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Text.backgroundColor(this.eyeMode ? { "id": 16777328, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1749,7 +1753,7 @@ class Reader extends ViewPU {
             Text.width('92%');
             Text.height(1);
             Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Text.backgroundColor(this.eyeMode ? { "id": 16777328, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1758,11 +1762,11 @@ class Reader extends ViewPU {
             //控制播放音量
             Row.width('100%');
             //控制播放音量
-            Row.padding({ left: 10, right: 10 });
+            Row.padding({ left: 10, right: 10, bottom: 7 });
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777320, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
             Text.fontSize(16);
             Text.width(50);
             Text.margin({ left: 5 });
@@ -1785,6 +1789,7 @@ class Reader extends ViewPU {
         }, Slider);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create(`${this.ttsVolume.toFixed(1)}`);
+            Text.fontColor(this.eyeMode ? Color.White : { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
             Text.width(30);
             Text.textAlign(TextAlign.Center);
@@ -1793,24 +1798,16 @@ class Reader extends ViewPU {
         //控制播放音量
         Row.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create();
-            Text.width('92%');
-            Text.height(1);
-            Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-        }, Text);
-        Text.pop();
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
             //控制播放音调
             Row.create();
             //控制播放音调
             Row.width('100%');
             //控制播放音调
-            Row.padding({ left: 10, right: 10 });
+            Row.padding({ left: 10, right: 10, bottom: 7 });
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777323, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
             Text.fontSize(16);
             Text.width(50);
             Text.margin({ left: 5 });
@@ -1833,6 +1830,7 @@ class Reader extends ViewPU {
         }, Slider);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create(`${this.ttsPitch.toFixed(2)}`);
+            Text.fontColor(this.eyeMode ? Color.White : { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
             Text.width(40);
             Text.textAlign(TextAlign.Center);
@@ -1840,14 +1838,6 @@ class Reader extends ViewPU {
         Text.pop();
         //控制播放音调
         Row.pop();
-        this.observeComponentCreation2((elmtId, isInitialRender) => {
-            Text.create();
-            Text.width('92%');
-            Text.height(1);
-            Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-        }, Text);
-        Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             //控制播放语速
             Row.create();
@@ -1858,7 +1848,7 @@ class Reader extends ViewPU {
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777324, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
             Text.fontSize(16);
             Text.width(50);
             Text.margin({ left: 5 });
@@ -1881,6 +1871,7 @@ class Reader extends ViewPU {
         }, Slider);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create(`${this.ttsSpeed.toFixed(2)}x`);
+            Text.fontColor(this.eyeMode ? Color.White : { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
             Text.width(40);
             Text.textAlign(TextAlign.Center);
@@ -1893,7 +1884,7 @@ class Reader extends ViewPU {
             Text.width('92%');
             Text.height(1);
             Text.margin({ left: 16, top: 12, right: 16 });
-            Text.backgroundColor({ "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
+            Text.backgroundColor(this.eyeMode ? { "id": 16777328, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : { "id": 16777249, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
         }, Text);
         Text.pop();
         this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -1902,12 +1893,12 @@ class Reader extends ViewPU {
             //字体大小
             Row.width('100%');
             //字体大小
-            Row.padding({ left: 10, right: 10 });
+            Row.padding({ left: 10, right: 10, top: 5 });
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777318, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
-            Text.fontSize(16);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
+            Text.fontSize(14);
             Text.width(50);
             Text.margin({ left: 5 });
         }, Text);
@@ -1930,7 +1921,7 @@ class Reader extends ViewPU {
         }, Slider);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create(`${this.fontSize}`);
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
             Text.width(30);
             Text.textAlign(TextAlign.Center);
@@ -1945,10 +1936,12 @@ class Reader extends ViewPU {
             Row.width('100%');
             //行间距
             Row.padding({ left: 10, right: 10 });
+            //行间距
+            Row.margin({ bottom: 10 });
         }, Row);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create({ "id": 16777319, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : Color.Black);
             Text.fontSize(16);
             Text.width(50);
             Text.margin({ left: 5 });
@@ -1972,7 +1965,7 @@ class Reader extends ViewPU {
         }, Slider);
         this.observeComponentCreation2((elmtId, isInitialRender) => {
             Text.create(`${this.lineHeight.toFixed(1)}`);
-            Text.fontColor(Color.Black);
+            Text.fontColor(this.eyeMode ? Color.White : { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
             Text.fontSize(14);
             Text.width(40);
             Text.textAlign(TextAlign.Center);
@@ -1980,6 +1973,11 @@ class Reader extends ViewPU {
         Text.pop();
         //行间距
         Row.pop();
+        this.observeComponentCreation2((elmtId, isInitialRender) => {
+            Blank.create();
+            Blank.height(20);
+        }, Blank);
+        Blank.pop();
         Column.pop();
         Scroll.pop();
     }
@@ -2052,7 +2050,7 @@ class Reader extends ViewPU {
                                             hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
                                         }
                                     }
-                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1516, col: 9 });
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1513, col: 9 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {
@@ -2252,7 +2250,7 @@ class Reader extends ViewPU {
                                     // 底部按钮栏
                                     Row.height(80);
                                     // 底部按钮栏
-                                    Row.backgroundColor(Color.White);
+                                    Row.backgroundColor(this.eyeMode ? "#ff4f4f4f" : Color.White);
                                 }, Row);
                                 this.observeComponentCreation2((elmtId, isInitialRender) => {
                                     Text.create({ "id": 16777226, "type": 10003, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" });
@@ -2260,7 +2258,8 @@ class Reader extends ViewPU {
                                     Text.height('100%');
                                     Text.onClick(() => this.jumpToCatalogList());
                                     Text.textAlign(TextAlign.Center);
-                                    Text.fontColor(this.currentIndex === 0 ? Color.Red : Color.Black);
+                                    Text.fontColor(this.currentIndex === 0 ? Color.Red :
+                                        this.eyeMode ? { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : Color.Black);
                                 }, Text);
                                 Text.pop();
                                 this.observeComponentCreation2((elmtId, isInitialRender) => {
@@ -2269,7 +2268,8 @@ class Reader extends ViewPU {
                                     Text.height('100%');
                                     Text.onClick(() => this.jumpToSetting());
                                     Text.textAlign(TextAlign.Center);
-                                    Text.fontColor(this.currentIndex === 1 ? Color.Red : Color.Black);
+                                    Text.fontColor(this.currentIndex === 1 ? Color.Red :
+                                        this.eyeMode ? { "id": 16777329, "type": 10001, params: [], "bundleName": "com.example.readerkitdemo", "moduleName": "entry" } : Color.Black);
                                 }, Text);
                                 Text.pop();
                                 // 底部按钮栏

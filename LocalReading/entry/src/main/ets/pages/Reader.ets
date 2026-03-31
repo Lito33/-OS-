@@ -129,7 +129,7 @@ struct Reader {
   @State themeSelectIndex: number = 0;
   // 单手模式：点击屏幕左右两侧都翻到下一页
   @State singleHandMode: boolean = false;
-//阅读相关设置
+  //阅读相关设置
   private readerSetting: readerCore.ReaderSetting = {
     fontName: BookUtils.getString(this.getUIContext().getHostContext(), 'system_font'),
     fontPath: '',
@@ -371,7 +371,7 @@ struct Reader {
   }
 
   //资源请求回调。字体文件和主题背景图像可以存储在resources/rawfile目录或应用沙盒路径中。
-  //前面这一坨表示一个接收字符串参数（文件路径）并返回 ArrayBuffer 的回调。
+  //前面这一坨表示一个接收字符串参数（文件路径）并返回 ArrayBuffer 的回调。处理书籍内的图片、字体
   private resourceRequest: bookParser.CallbackRes<string, ArrayBuffer> = (filePath: string): ArrayBuffer => {
     hilog.info(0x0000, TAG,
       'resourceRequest : filePath = ' + filePath + ', this.selectFontPath = ' + this.selectFontPath);
@@ -916,7 +916,8 @@ struct Reader {
         Stack() {//用层叠布局
           //通过 SymbolGlyph 组件可将图标嵌入界面，并支持多色渲染、动态效果等特性
           SymbolGlyph($r('sys.symbol.xmark'))
-            .fontColor([$r('app.color.ohos_id_color_primary_light')])
+            .fontColor(this.eyeMode ? [$r('app.color.ic_border_select_white')] :
+              [$r('app.color.ohos_id_color_primary_light')])
             .width(18)
             .fontSize(18)
             .fontWeight(600)
@@ -974,7 +975,7 @@ struct Reader {
         Text(this.bookTitle)
           .fontSize($r('sys.float.ohos_id_text_size_body1'))
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .fontColor($r('app.color.black_90_opacity'))
+          .fontColor(this.eyeMode ? Color.White : $r('app.color.black_90_opacity'))
           .maxLines(1)
           .margin({ right: 12, left: 12 })
           .fontWeight(FontWeight.Bold)
@@ -998,10 +999,12 @@ struct Reader {
                 Row() {
                   Text(' · ')
                     .fontSize(14)
-                    .fontColor(this.isCurrentChapterByIndex(item.index) ? $r('app.color.blue') : $r('app.color.black_90_opacity'))
+                    .fontColor(this.isCurrentChapterByIndex(item.index) ? $r('app.color.blue') :
+                      (this.eyeMode ? Color.White : $r('app.color.black_90_opacity')))
                   Text(item.name)
                     .fontSize(14)
-                    .fontColor(this.isCurrentChapterByIndex(item.index) ? $r('app.color.blue') : $r('app.color.black_90_opacity'))
+                    .fontColor(this.isCurrentChapterByIndex(item.index) ? $r('app.color.blue') :
+                      (this.eyeMode ? Color.White : $r('app.color.black_90_opacity')))
                     .fontWeight(this.isCurrentChapterByIndex(item.index) ? FontWeight.Bold : FontWeight.Normal)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .padding({ top: 8, bottom: 8 })
@@ -1037,7 +1040,7 @@ struct Reader {
     .width('100%')
     .borderRadius({ topRight: 32, topLeft: 32 })
     .visibility(this.currentIndex === 0 ? Visibility.Visible : Visibility.None)
-    .backgroundColor(this.eyeMode ? '#FAF9DE' : $r('app.color.page_background1'))
+    .backgroundColor(this.eyeMode ? $r('app.color.page_Reader_back') : $r('app.color.page_background1'))
     .zIndex(3)
   }
 
@@ -1114,13 +1117,13 @@ struct Reader {
         .width('92%')
         .height(1)
         .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
+        .backgroundColor(this.eyeMode ? $r('app.color.ic_bg_black') : $r('app.color.ic_bg_grey'))
 
       //翻页组件
       Row({ space: 20 }) {
 
         Text($r('app.string.PageMode'))
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
           .fontSize(15)
           .width(65)
           .margin({left:5})
@@ -1150,7 +1153,7 @@ struct Reader {
         Text($r('app.string.emulation_page'))
           .fontSize(16)
           .lineHeight(21)
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
 
         Radio({
           value: 'flipMode', group: 'radioGroup'
@@ -1173,7 +1176,7 @@ struct Reader {
         Text($r('app.string.transversal_slip_page'))
           .fontSize(16)
           .lineHeight(21)
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
       }
       .width('100%')
       .margin({ left: 16, top: 16, right: 16 })
@@ -1182,15 +1185,16 @@ struct Reader {
         .width('92%')
         .height(1)
         .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
+        .backgroundColor(this.eyeMode ? $r('app.color.ic_bg_black') : $r('app.color.ic_bg_grey'))
 
       // 单手模式开关
       Row() {
         Text($r('app.string.SingleMode'))
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
           .fontSize(15)
+          .fontWeight(FontWeight.Bold)
           .width(65)
-          .margin({ left: 5 })
+          .margin({ left: 5 ,right: 5 })
 
         Toggle({ type: ToggleType.Switch, isOn: this.singleHandMode })
           .selectedColor(Color.Blue)
@@ -1202,7 +1206,7 @@ struct Reader {
 
         Text($r('app.string.SingleModeDescription'))
           .fontSize(14)
-          .fontColor('#666666')
+          .fontColor(this.eyeMode ? '#ff7c7c7c' : '#666666')
           .margin({ left: 8 })
       }
       .width('100%')
@@ -1212,7 +1216,7 @@ struct Reader {
         .width('92%')
         .height(1)
         .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
+        .backgroundColor(this.eyeMode ? $r('app.color.ic_bg_black') : $r('app.color.ic_bg_grey'))
 
       Scroll() {
         Row({ space: 12 }) {
@@ -1295,12 +1299,12 @@ struct Reader {
         .width('92%')
         .height(1)
         .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
+        .backgroundColor(this.eyeMode ? $r('app.color.ic_bg_black') : $r('app.color.ic_bg_grey'))
 
       //控制播放音量
       Row(){
         Text($r('app.string.SpeechVolume'))
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
           .fontSize(16)
           .width(50)
           .margin({left:5})
@@ -1320,23 +1324,18 @@ struct Reader {
           })
 
         Text(`${this.ttsVolume.toFixed(1)}`)
+          .fontColor(this.eyeMode ? Color.White : $r('app.color.page_Reader_font'))
           .fontSize(14)
           .width(30)
           .textAlign(TextAlign.Center)
       }
       .width('100%')
-      .padding({left:10, right:10})
-
-      Text()
-        .width('92%')
-        .height(1)
-        .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
+      .padding({left:10, right:10,bottom: 7 })
 
       //控制播放音调
       Row(){
         Text($r('app.string.SpeechPitch'))
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
           .fontSize(16)
           .width(50)
           .margin({left:5})
@@ -1356,23 +1355,19 @@ struct Reader {
           })
 
         Text(`${this.ttsPitch.toFixed(2)}`)
+          .fontColor(this.eyeMode ? Color.White : $r('app.color.page_Reader_font'))
           .fontSize(14)
           .width(40)
           .textAlign(TextAlign.Center)
       }
       .width('100%')
-      .padding({left:10, right:10})
+      .padding({left:10, right:10, bottom: 7})
 
-      Text()
-        .width('92%')
-        .height(1)
-        .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
 
       //控制播放语速
       Row(){
         Text($r('app.string.SpeechRate'))
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
           .fontSize(16)
           .width(50)
           .margin({left:5})
@@ -1392,6 +1387,7 @@ struct Reader {
           })
 
         Text(`${this.ttsSpeed.toFixed(2)}x`)
+          .fontColor(this.eyeMode ? Color.White : $r('app.color.page_Reader_font'))
           .fontSize(14)
           .width(40)
           .textAlign(TextAlign.Center)
@@ -1403,13 +1399,13 @@ struct Reader {
         .width('92%')
         .height(1)
         .margin({ left: 16, top: 12, right: 16 })
-        .backgroundColor($r('app.color.ic_bg_grey'))
+        .backgroundColor(this.eyeMode ? $r('app.color.ic_bg_black') : $r('app.color.ic_bg_grey'))
 
       //字体大小
       Row(){
         Text($r('app.string.FontSize'))
-          .fontColor(Color.Black)
-          .fontSize(16)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
+          .fontSize(14)
           .width(50)
           .margin({left:5})
 
@@ -1429,19 +1425,19 @@ struct Reader {
           })
 
         Text(`${this.fontSize}`)
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : $r('app.color.page_Reader_font'))
           .fontSize(14)
           .width(30)
           .textAlign(TextAlign.Center)
       }
       .width('100%')
-      .padding({left:10, right:10})
+      .padding({left:10, right:10,top: 5})
 
 
       //行间距
       Row(){
         Text($r('app.string.LineHeight'))
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : Color.Black)
           .fontSize(16)
           .width(50)
           .margin({left:5})
@@ -1462,16 +1458,17 @@ struct Reader {
           })
 
         Text(`${this.lineHeight.toFixed(1)}`)
-          .fontColor(Color.Black)
+          .fontColor(this.eyeMode ? Color.White : $r('app.color.page_Reader_font'))
           .fontSize(14)
           .width(40)
           .textAlign(TextAlign.Center)
       }
       .width('100%')
       .padding({left:10, right:10})
+      .margin({bottom: 10 })
 
-
-      // 字体大小和行间距现在通过滑块实时更新，不再需要确认按钮
+        Blank()
+          .height(20)
 
       }
       .width('100%')
@@ -1482,7 +1479,7 @@ struct Reader {
     .width('100%')
     .height('100%')
     .visibility(this.currentIndex === 1 ? Visibility.Visible : Visibility.None)
-    .backgroundColor(this.eyeMode ? '#FAF9DE' : $r('app.color.page_background1'))
+    .backgroundColor(this.eyeMode ? $r('app.color.page_Reader_back') : $r('app.color.page_background1'))
     .borderRadius({ topRight: 32, topLeft: 32 })
     .zIndex(3)
   }
@@ -1621,17 +1618,19 @@ struct Reader {
                 .height('100%')
                 .onClick(() => this.jumpToCatalogList())
                 .textAlign(TextAlign.Center)
-                .fontColor(this.currentIndex === 0 ? Color.Red : Color.Black)
+                .fontColor(this.currentIndex === 0 ? Color.Red :
+                  this.eyeMode ? $r('app.color.page_Reader_font') : Color.Black)
               Text($r('app.string.setting'))
                 .width('50%')
                 .height('100%')
                 .onClick(() => this.jumpToSetting())
                 .textAlign(TextAlign.Center)
-                .fontColor(this.currentIndex === 1 ? Color.Red : Color.Black)
+                .fontColor(this.currentIndex === 1 ? Color.Red :
+                  this.eyeMode ? $r('app.color.page_Reader_font') : Color.Black)
             }
             .width('100%')
             .height(80)
-            .backgroundColor(Color.White)
+            .backgroundColor(this.eyeMode ? "#ff4f4f4f" : Color.White)
           }
           .width('100%')
           .height('65%')

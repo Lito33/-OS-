@@ -69,6 +69,10 @@
       "value": "#F7F7F7"
     },
     {
+      "name": "ic_bg_black",
+      "value": "#FFCACACA"
+    },
+    {
       "name": "ic_bg_font_selected",
       "value": "#FFF5F6"
     },
@@ -95,6 +99,14 @@
     {
       "name": "page_background2",
       "value": "#fffcebde"
+    },
+    {
+      "name": "page_Reader_back",
+      "value": "#ff484848"
+    },
+    {
+      "name": "page_Reader_font",
+      "value": "#FFA5A5A5"
     }
   ]
 }

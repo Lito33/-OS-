@@ -154,7 +154,7 @@ export class Index extends ViewPU {
     set isRefreshing(newValue: boolean) {
         this.__isRefreshing.set(newValue);
     }
-    // ✅ 监听进度更新标志，当Reader保存进度时触发刷新
+    // 监听进度更新标志，当Reader保存进度时触发刷新
     private __progressUpdated: ObservedPropertyAbstractPU<number>;
     get progressUpdated() {
         return this.__progressUpdated.get();
@@ -320,7 +320,7 @@ export class Index extends ViewPU {
         hilog.info(0x0000, TAG, 'User changed to: ' + this.currentUser);
         await this.reloadData();
     }
-    // ✅ 进度更新监听回调
+    // 进度更新监听回调
     async onProgressUpdated() {
         hilog.info(0x0000, TAG, `Progress updated detected, reloading data... (timestamp: ${this.progressUpdated})`);
         await this.reloadData();
