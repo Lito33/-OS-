@@ -9,7 +9,7 @@ export interface PersistedReaderSettings {
   fontPath: string;
   fontSize: number;
   lineHeight: number;
-  nightMode: boolean; //万一呢
+  nightMode: boolean;//万一呢
   themeColor: string;
   themeBgImg: string;
   flipMode: string;

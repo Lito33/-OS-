@@ -880,6 +880,8 @@ class Reader extends ViewPU {
         hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}, bookIdentity=${bookIdentity}`);
         await ProgressStorage.saveProgress(context, progress, currentUser);
         hilog.info(0x0000, TAG, 'saveCurrentProgress: progress saved successfully');
+        // ✅ 通知Index页面进度已更新，触发刷新
+        AppStorage.setOrCreate('progressUpdated', Date.now());
         //保存后自动同步-每次翻页后
         await DistributedSyncManager.getInstance().syncProgressOnly();
     }
@@ -2050,7 +2052,7 @@ class Reader extends ViewPU {
                                             hilog.info(0x0000, TAG, `ReadPageComponent init failed, Code: ${err.code}, message: ${err.message}`);
                                         }
                                     }
-                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1515, col: 9 });
+                                }, undefined, elmtId, () => { }, { page: "entry/src/main/ets/pages/Reader.ets", line: 1516, col: 9 });
                                 ViewPU.create(componentCall);
                                 let paramsLambda = () => {
                                     return {

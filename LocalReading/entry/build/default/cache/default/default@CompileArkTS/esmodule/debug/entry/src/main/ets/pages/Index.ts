@@ -10,6 +10,7 @@ interface Index_Params {
     selectedBook?: BookParserInfo | null;
     progresses?: BookProgress[];
     isRefreshing?: boolean;
+    progressUpdated?: number;
     currentUser?: string;
 }
 import picker from "@ohos:file.picker";
@@ -43,8 +44,10 @@ export class Index extends ViewPU {
         this.__selectedBook = new ObservedPropertyObjectPU(null, this, "selectedBook");
         this.__progresses = new ObservedPropertyObjectPU([], this, "progresses");
         this.__isRefreshing = new ObservedPropertySimplePU(false, this, "isRefreshing");
+        this.__progressUpdated = this.createStorageLink('progressUpdated', 0, "progressUpdated");
         this.__currentUser = this.createStorageLink('currentUser', '', "currentUser");
         this.setInitiallyProvidedValue(params);
+        this.declareWatch("progressUpdated", this.onProgressUpdated);
         this.declareWatch("currentUser", this.onUserChange);
         this.finalizeConstruction();
     }
@@ -78,6 +81,7 @@ export class Index extends ViewPU {
         this.__selectedBook.purgeDependencyOnElmtId(rmElmtId);
         this.__progresses.purgeDependencyOnElmtId(rmElmtId);
         this.__isRefreshing.purgeDependencyOnElmtId(rmElmtId);
+        this.__progressUpdated.purgeDependencyOnElmtId(rmElmtId);
         this.__currentUser.purgeDependencyOnElmtId(rmElmtId);
     }
     aboutToBeDeleted() {
@@ -88,6 +92,7 @@ export class Index extends ViewPU {
         this.__selectedBook.aboutToBeDeleted();
         this.__progresses.aboutToBeDeleted();
         this.__isRefreshing.aboutToBeDeleted();
+        this.__progressUpdated.aboutToBeDeleted();
         this.__currentUser.aboutToBeDeleted();
         SubscriberManager.Get().delete(this.id__());
         this.aboutToBeDeletedInternal();
@@ -148,6 +153,14 @@ export class Index extends ViewPU {
     }
     set isRefreshing(newValue: boolean) {
         this.__isRefreshing.set(newValue);
+    }
+    // ✅ 监听进度更新标志，当Reader保存进度时触发刷新
+    private __progressUpdated: ObservedPropertyAbstractPU<number>;
+    get progressUpdated() {
+        return this.__progressUpdated.get();
+    }
+    set progressUpdated(newValue: number) {
+        this.__progressUpdated.set(newValue);
     }
     async aboutToAppear() {
         hilog.info(0x0000, TAG, 'aboutToAppear');
@@ -305,6 +318,11 @@ export class Index extends ViewPU {
     }
     async onUserChange() {
         hilog.info(0x0000, TAG, 'User changed to: ' + this.currentUser);
+        await this.reloadData();
+    }
+    // ✅ 进度更新监听回调
+    async onProgressUpdated() {
+        hilog.info(0x0000, TAG, `Progress updated detected, reloading data... (timestamp: ${this.progressUpdated})`);
         await this.reloadData();
     }
     async reloadData() {

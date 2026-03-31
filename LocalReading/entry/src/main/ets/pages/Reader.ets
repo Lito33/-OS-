@@ -1,4 +1,4 @@
-//阅读页
+﻿//阅读页
 import { WindowAbility } from '../entryability/WindowAbility';
 import { display } from '@kit.ArkUI';
 import { fileIo as fs } from '@kit.CoreFileKit';
@@ -164,7 +164,7 @@ struct Reader {
       await new Promise<void>(resolve => setTimeout(resolve, 50));
     }
     hilog.info(0x0000, TAG, `aboutToAppear: windowSize = ${this.windowWidth}x${this.windowHeight}`);
-    
+
     // 更新readerSetting的视口尺寸
     if (this.windowWidth > 0 && this.windowHeight > 0) {
       this.readerSetting.viewPortWidth = this.windowWidth;
@@ -308,8 +308,6 @@ struct Reader {
       this.loadError = `加载失败: ${error.message || '未知错误'}`;
     }
 
-    
-
 
     //预加载
     emitter.on("eventId", () => {
@@ -421,7 +419,7 @@ struct Reader {
     // 当前章节 = resourceIndex + 1（resourceIndex从0开始）
     this.currentChapter = data.resourceIndex + 1;
     this.totalChapters = spineList.length;
-    
+
     hilog.info(0x0000, TAG, `Chapter: ${this.currentChapter}/${this.totalChapters}`);
   }
 
@@ -429,7 +427,7 @@ struct Reader {
   private buildFullChapterList(): void {
     const spineList = this.defaultHandler?.getSpineList() || [];
     const catalogList = this.defaultHandler?.getCatalogList() || [];
-    
+
     if (spineList.length === 0) {
       return;
     }
@@ -445,7 +443,7 @@ struct Reader {
         (spineItem.href && item.href && spineItem.href.includes(item.href)) ||
         (spineItem.idRef && item.href && spineItem.idRef.includes(item.href))
       );
-      
+
       if (catalogItem) {
         chapterName = catalogItem.catalogName;
       } else {
@@ -459,7 +457,7 @@ struct Reader {
         href: spineItem.href || spineItem.idRef || ''
       });
     }
-    
+
     hilog.info(0x0000, TAG, `buildFullChapterList: spineList.length=${spineList.length}, catalogList.length=${catalogList.length}, total chapters = ${this.fullChapterList.length}`);
   }
 
@@ -472,12 +470,12 @@ struct Reader {
       this.currentData = data;
       // 保存页面数据
       AppStorage.setOrCreate('currentData', this.currentData);
-      
+
       // 更新章节信息
       this.updateChapterInfo(data);
 
       // 只要页面状态变化就保存进度，不仅仅是 PAGE_ON_SHOW
-      if (data.state === readerCore.PageState.PAGE_ON_SHOW || 
+      if (data.state === readerCore.PageState.PAGE_ON_SHOW ||
           data.state === readerCore.PageState.PAGE_LOADING) {
         this.isLoading = false;
         //保存阅读进度
@@ -530,8 +528,8 @@ struct Reader {
         const spineItem = spineList[data.resourceIndex];
         if (spineItem) {
           // 尝试多种匹配方式
-          const catalogItem = catalogList.find(item => 
-            item.href === spineItem.href || 
+          const catalogItem = catalogList.find(item =>
+            item.href === spineItem.href ||
             item.href === spineItem.idRef ||
             (spineItem.href && item.href && spineItem.href.includes(item.href))
           );
@@ -556,10 +554,13 @@ struct Reader {
       chapterName: chapterName,
       lastReadTime: Date.now()
     };
-    
+
     hilog.info(0x0000, TAG, `saveCurrentProgress: saving progress for ${filePath}, bookIdentity=${bookIdentity}`);
     await ProgressStorage.saveProgress(context, progress, currentUser);
     hilog.info(0x0000, TAG, 'saveCurrentProgress: progress saved successfully');
+    
+    // ✅ 通知Index页面进度已更新，触发刷新
+    AppStorage.setOrCreate('progressUpdated', Date.now());
 
     //保存后自动同步-每次翻页后
     await DistributedSyncManager.getInstance().syncProgressOnly();
@@ -572,7 +573,7 @@ struct Reader {
     hilog.info(0x0000, TAG, `startPlay: path=${path}`);
     hilog.info(0x0000, TAG, `startPlay: path length=${path?.length}, path type=${typeof path}`);
     hilog.info(0x0000, TAG, `startPlay: resourceIndex=${resourceIndex}, domPos=${domPos}`);
-    
+
     try {
 
       // 验证文件路径
@@ -596,12 +597,12 @@ struct Reader {
 
       let context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       hilog.info(0x0000, TAG, `startPlay: context obtained, path=${path}`);
-      
+
      //调用阅读器控制器的初始化方法，传入上下文，准备阅读环境。
       let initPromise: Promise<void> = this.readerComponentController.init(context).catch((err: BusinessError) => {
         hilog.error(0x0000, TAG, `startPlay: readerComponentController.init failed: ${err?.message}`);
       });
-      
+
       //通过书籍解析器工厂（bookParser.getDefaultHandler）根据文件路径获取对应的解析器处理器（例如针对TXT、EPUB等不同格式的解析器）
       let defaultHandler: Promise<bookParser.BookParserHandler | null> = bookParser.getDefaultHandler(path)
         .then((handler) => {
@@ -612,36 +613,36 @@ struct Reader {
           hilog.error(0x0000, TAG, `startPlay: getDefaultHandler failed, Code: ${err?.code}, message: ${err?.message}`);
           return null;
         });
-      
+
       //Promise.all同时执行两个异步任务，提高效率.result[0]为解析器处理器，result[1]为init完成信号（void）。
       let result: [bookParser.BookParserHandler | null, void] = await Promise.all([defaultHandler, initPromise]);
 
       //将获取到的解析器处理器保存到实例变量，供后续使用
       this.defaultHandler = result[0];
-      
+
       // 验证解析器是否成功获取
       if (!this.defaultHandler) {
         hilog.error(0x0000, TAG, 'startPlay: defaultHandler is null, cannot continue');
         this.loadError = '无法解析书籍文件，请检查文件格式是否正确';
         return;
       }
-      
+
       //将解析器注册到阅读器控制器，这样控制器就能通过解析器获取书籍章节内容。
       this.readerComponentController.registerBookParser(this.defaultHandler);
       hilog.info(0x0000, TAG, 'startPlay: registerBookParser completed');
-      
+
       // 确保视口尺寸正确后再设置页面配置
       if (this.windowWidth > 0 && this.windowHeight > 0) {
         this.readerSetting.viewPortWidth = this.windowWidth;
         this.readerSetting.viewPortHeight = this.windowHeight;
       }
       hilog.info(0x0000, TAG, `startPlay: readerSetting viewPort=${this.readerSetting.viewPortWidth}x${this.readerSetting.viewPortHeight}`);
-      
+
       this.readerComponentController.setPageConfig(this.readerSetting);
-      
+
       // 获取书籍信息（标题、作者、封面）- 必须在startPlay之前调用
       await this.getBookInfo();
-      
+
       // 预加载目录列表（避免点击目录时才加载导致延迟）
       try {
         this.catalogItemList = this.defaultHandler?.getCatalogList() || [];
@@ -649,7 +650,7 @@ struct Reader {
       } catch (e) {
         hilog.error(0x0000, TAG, `startPlay: getCatalogList failed: ${e}`);
       }
-      
+
       //启动阅读，跳转到指定章节并定位到domPos指定的文档位置。
       try {
         await this.readerComponentController.startPlay(resourceIndex || 0, domPos);
@@ -760,7 +761,7 @@ struct Reader {
   @State isClicked :boolean = false;
   private speaker: Speaker = new Speaker();
   private currentPageText: string = '';// 存储当前页文本
-  
+
   // TTS朗读设置状态变量
   @State ttsVolume: number = 1.0;    // 音量 (0-2)
   @State ttsPitch: number = 1.0;     // 音调 (0.5-2.0)
@@ -1757,7 +1758,7 @@ struct Reader {
     if (chapterIndex < 0) {
       return;
     }
-    
+
     try {
       await this.readerComponentController.startPlay(chapterIndex, '');
       hilog.info(0x0000, TAG, `jumpToChapter: jumped to chapter ${chapterIndex}`);
